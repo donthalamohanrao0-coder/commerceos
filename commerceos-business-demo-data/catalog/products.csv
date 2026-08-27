@@ -1,0 +1,13 @@
+product_id,sku,name,category,brand,price_inr,compare_at_price_inr,stock,rating,review_count,description,tags,image_key
+prod_lap_001,NT-LAP-001,NovaBook Pro 14,Laptops,NovaTech,74999,79999,18,4.7,126,"14-inch productivity laptop with 16GB RAM and 512GB SSD, designed for software development and professional work.",coding|student|developer|portable|work,laptop_01
+prod_lap_002,NT-LAP-002,NovaBook Air 13,Laptops,NovaTech,61999,64999,24,4.5,89,"Lightweight 13-inch laptop for study, office work, browsing and travel.",student|travel|office|portable,laptop_01
+prod_lap_003,NT-LAP-003,NovaBook Studio 15,Laptops,NovaTech,89999,94999,7,4.8,54,"15-inch high-performance laptop for development, creative work and demanding multitasking.",developer|creative|performance|professional,laptop_01
+prod_phone_001,NT-PHN-001,NovaPhone X1,Smartphones,NovaTech,42999,45999,31,4.6,143,"Premium smartphone with a high-refresh display, multi-camera system and all-day battery.",phone|camera|premium|battery,phone_01
+prod_phone_002,NT-PHN-002,NovaPhone S1,Smartphones,NovaTech,24999,26999,46,4.4,97,"Balanced smartphone for everyday communication, streaming, photography and productivity.",phone|value|everyday,phone_01
+prod_audio_001,NT-AUD-001,NovaSound Pro ANC,Audio,NovaTech,8999,10999,42,4.6,211,Over-ear wireless headphones with active noise cancellation and long battery life.,headphones|anc|travel|work,headphones_01
+prod_audio_002,NT-AUD-002,NovaBuds Mini,Audio,NovaTech,3999,4499,65,4.3,156,"Compact wireless earbuds for commuting, calls and everyday listening.",earbuds|calls|commute,headphones_01
+prod_keyboard_001,NT-KBD-001,NovaType Mechanical 75,Keyboards,NovaTech,5499,5999,37,4.7,118,Compact mechanical keyboard with RGB backlighting and programmable controls.,keyboard|coding|gaming|office,keyboard_01
+prod_mouse_001,NT-MSE-001,NovaGlide Wireless Mouse,Mice,NovaTech,1499,1799,74,4.5,204,Ergonomic wireless mouse for productivity and long work sessions.,mouse|coding|office|ergonomic,mouse_01
+prod_hub_001,NT-HUB-001,NovaHub 8-in-1 USB-C,Accessories,NovaTech,2999,3499,51,4.4,72,"USB-C hub with HDMI, USB-A, USB-C and SD/microSD connectivity for modern laptops.",hub|usb-c|laptop|developer|travel,hub_01
+prod_watch_001,NT-WCH-001,NovaWatch Fit,Wearables,NovaTech,6999,7999,28,4.3,63,"Smartwatch with fitness tracking, notifications and a bright touch display.",watch|fitness|notifications,watch_01
+prod_stand_001,NT-STD-001,NovaLift Aluminum Stand,Accessories,NovaTech,2199,2499,33,4.6,48,Adjustable aluminum laptop stand for a more comfortable desk setup.,laptop stand|desk|ergonomics,laptop_01

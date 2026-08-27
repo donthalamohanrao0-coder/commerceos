@@ -1,0 +1,50 @@
+[
+  {
+    "document_id": "customer_support_faq",
+    "path": "knowledge/customer_support_faq.md",
+    "document_type": "faq_or_guide",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "payment_faq",
+    "path": "knowledge/payment_faq.md",
+    "document_type": "faq_or_guide",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "product_recommendation_guide",
+    "path": "knowledge/product_recommendation_guide.md",
+    "document_type": "faq_or_guide",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "returns_policy",
+    "path": "knowledge/returns_policy.md",
+    "document_type": "merchant_policy",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "shipping_policy",
+    "path": "knowledge/shipping_policy.md",
+    "document_type": "merchant_policy",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "warranty_policy",
+    "path": "knowledge/warranty_policy.md",
+    "document_type": "merchant_policy",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  }
+]

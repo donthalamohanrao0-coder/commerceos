@@ -1,0 +1,37 @@
+[
+  {
+    "category_id": "cat_laptops",
+    "name": "Laptops",
+    "description": "Portable computers for study, software development and professional work."
+  },
+  {
+    "category_id": "cat_phones",
+    "name": "Smartphones",
+    "description": "Everyday and premium mobile devices."
+  },
+  {
+    "category_id": "cat_audio",
+    "name": "Audio",
+    "description": "Headphones and earbuds for calls, work, travel and entertainment."
+  },
+  {
+    "category_id": "cat_keyboards",
+    "name": "Keyboards",
+    "description": "Mechanical and productivity keyboards."
+  },
+  {
+    "category_id": "cat_mice",
+    "name": "Mice",
+    "description": "Wireless and ergonomic pointing devices."
+  },
+  {
+    "category_id": "cat_accessories",
+    "name": "Accessories",
+    "description": "Connectivity and desk accessories."
+  },
+  {
+    "category_id": "cat_wearables",
+    "name": "Wearables",
+    "description": "Smartwatches and fitness-focused devices."
+  }
+]

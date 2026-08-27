@@ -1,0 +1,126 @@
+[
+  {
+    "order_id": "ord_1001",
+    "customer_id": "cus_001",
+    "status": "paid",
+    "payment_status": "paid",
+    "subtotal_inr": 74999,
+    "discount_inr": 1000,
+    "shipping_inr": 0,
+    "total_inr": 73999,
+    "items": [
+      {
+        "product_id": "prod_lap_001",
+        "qty": 1,
+        "unit_price_inr": 74999
+      }
+    ],
+    "source": "ai_assisted",
+    "created_at": "2026-08-20T10:14:00+05:30"
+  },
+  {
+    "order_id": "ord_1002",
+    "customer_id": "cus_002",
+    "status": "paid",
+    "payment_status": "paid",
+    "subtotal_inr": 61999,
+    "discount_inr": 500,
+    "shipping_inr": 0,
+    "total_inr": 61499,
+    "items": [
+      {
+        "product_id": "prod_lap_002",
+        "qty": 1,
+        "unit_price_inr": 61999
+      }
+    ],
+    "source": "customer",
+    "created_at": "2026-08-20T14:20:00+05:30"
+  },
+  {
+    "order_id": "ord_1003",
+    "customer_id": "cus_003",
+    "status": "paid",
+    "payment_status": "paid",
+    "subtotal_inr": 10498,
+    "discount_inr": 500,
+    "shipping_inr": 0,
+    "total_inr": 9998,
+    "items": [
+      {
+        "product_id": "prod_audio_001",
+        "qty": 1,
+        "unit_price_inr": 8999
+      },
+      {
+        "product_id": "prod_mouse_001",
+        "qty": 1,
+        "unit_price_inr": 1499
+      }
+    ],
+    "source": "ai_assisted",
+    "created_at": "2026-08-21T09:45:00+05:30"
+  },
+  {
+    "order_id": "ord_1004",
+    "customer_id": "cus_004",
+    "status": "paid",
+    "payment_status": "paid",
+    "subtotal_inr": 42999,
+    "discount_inr": 0,
+    "shipping_inr": 0,
+    "total_inr": 42999,
+    "items": [
+      {
+        "product_id": "prod_phone_001",
+        "qty": 1,
+        "unit_price_inr": 42999
+      }
+    ],
+    "source": "customer",
+    "created_at": "2026-08-21T18:10:00+05:30"
+  },
+  {
+    "order_id": "ord_1005",
+    "customer_id": "cus_005",
+    "status": "paid",
+    "payment_status": "paid",
+    "subtotal_inr": 6998,
+    "discount_inr": 500,
+    "shipping_inr": 0,
+    "total_inr": 6498,
+    "items": [
+      {
+        "product_id": "prod_keyboard_001",
+        "qty": 1,
+        "unit_price_inr": 5499
+      },
+      {
+        "product_id": "prod_mouse_001",
+        "qty": 1,
+        "unit_price_inr": 1499
+      }
+    ],
+    "source": "ai_assisted",
+    "created_at": "2026-08-22T11:32:00+05:30"
+  },
+  {
+    "order_id": "ord_1006",
+    "customer_id": "cus_006",
+    "status": "payment_pending",
+    "payment_status": "pending",
+    "subtotal_inr": 6999,
+    "discount_inr": 0,
+    "shipping_inr": 0,
+    "total_inr": 6999,
+    "items": [
+      {
+        "product_id": "prod_watch_001",
+        "qty": 1,
+        "unit_price_inr": 6999
+      }
+    ],
+    "source": "external_ai_buyer",
+    "created_at": "2026-08-22T16:05:00+05:30"
+  }
+]

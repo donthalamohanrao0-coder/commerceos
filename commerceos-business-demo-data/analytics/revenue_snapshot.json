@@ -1,0 +1,54 @@
+{
+  "period": "2026-08-01/2026-08-24",
+  "currency": "INR",
+  "revenue_inr": 1248500,
+  "ai_assisted_revenue_inr": 428600,
+  "orders": 186,
+  "ai_assisted_orders": 61,
+  "conversion_rate": 3.8,
+  "ai_assisted_conversion_rate": 5.4,
+  "average_order_value_inr": 6712,
+  "ai_assisted_aov_inr": 7026,
+  "upsell_revenue_inr": 38400,
+  "cross_sell_revenue_inr": 51700,
+  "payment_success_rate": 97.8,
+  "top_products": [
+    {
+      "product_id": "prod_lap_001",
+      "units": 31,
+      "revenue_inr": 2324969
+    },
+    {
+      "product_id": "prod_phone_001",
+      "units": 24,
+      "revenue_inr": 1031976
+    },
+    {
+      "product_id": "prod_audio_001",
+      "units": 37,
+      "revenue_inr": 332963
+    },
+    {
+      "product_id": "prod_mouse_001",
+      "units": 58,
+      "revenue_inr": 86942
+    }
+  ],
+  "top_cross_sell_pairs": [
+    {
+      "primary": "prod_lap_001",
+      "secondary": "prod_mouse_001",
+      "attach_rate": 0.31
+    },
+    {
+      "primary": "prod_lap_001",
+      "secondary": "prod_hub_001",
+      "attach_rate": 0.22
+    },
+    {
+      "primary": "prod_keyboard_001",
+      "secondary": "prod_mouse_001",
+      "attach_rate": 0.44
+    }
+  ]
+}

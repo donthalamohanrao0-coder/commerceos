@@ -1,0 +1,50 @@
+{
+  "merchant_id": "mrc_novatech_001",
+  "business_name": "NovaTech Store",
+  "legal_name": "NovaTech Retail Labs Pvt. Ltd.",
+  "description": "A fictional India-based online electronics merchant focused on laptops, mobile devices, accessories, and work-from-home technology.",
+  "currency": "INR",
+  "country": "IN",
+  "timezone": "Asia/Kolkata",
+  "website": "https://demo.novatech.example",
+  "support_email": "support@novatech.example",
+  "support_phone": "+91-80-4000-1000",
+  "brand": {
+    "positioning": "Premium, practical technology for work, study and everyday life.",
+    "tone": [
+      "clear",
+      "helpful",
+      "confident",
+      "non-pushy"
+    ],
+    "never_claim": [
+      "fake scarcity",
+      "fake popularity",
+      "unsupported specifications",
+      "guaranteed savings without eligibility"
+    ],
+    "recommendation_style": "Explain the trade-off and why a product matches the customer's stated needs."
+  },
+  "business_hours": {
+    "mon_fri": "09:00-20:00",
+    "sat": "10:00-18:00",
+    "sun": "10:00-16:00"
+  },
+  "service_regions": [
+    "India"
+  ],
+  "tax": {
+    "default_gst_percent": 18,
+    "prices_are_tax_inclusive": true
+  },
+  "payment_methods": [
+    "Razorpay Cards",
+    "Razorpay UPI",
+    "Razorpay Netbanking",
+    "Razorpay Wallets"
+  ],
+  "support_sla": {
+    "standard": "within 1 business day",
+    "payment_issue": "within 4 business hours"
+  }
+}

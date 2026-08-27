@@ -1,0 +1,5 @@
+campaign_id,name,status,type,discount_percent,discount_inr,max_discount_inr,eligible_segments,eligible_categories,requires_merchant_approval,min_laptop_purchase_inr
+camp_student_10,Student Tech Boost,active,percentage,10,,1000,student,Laptops|Audio,False,
+camp_laptop_accessory,Laptop Setup Bonus,active,fixed,,500,,,Accessories|Mice|Keyboards,False,50000
+camp_weekend_audio,Weekend Audio Offer,active,percentage,5,,500,,Audio,False,
+camp_high_value,High Value Concierge,draft,percentage,12,,5000,professional|creator,,True,

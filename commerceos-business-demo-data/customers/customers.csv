@@ -1,0 +1,7 @@
+customer_id,name,email,city,segment,lifetime_value_inr,orders_count,preferred_categories,preferences
+cus_001,Aarav Mehta,aarav@example.test,Bengaluru,developer,128450,5,Laptops|Accessories,coding|portable setup
+cus_002,Diya Sharma,diya@example.test,Mumbai,student,65998,2,Laptops|Audio,budget-conscious|study
+cus_003,Rohan Iyer,rohan@example.test,Hyderabad,professional,91200,3,Audio|Accessories,calls|desk setup
+cus_004,Ananya Rao,ananya@example.test,Pune,creator,154900,4,Laptops|Smartphones,performance|camera
+cus_005,Kabir Singh,kabir@example.test,Delhi,gamer,78300,3,Keyboards|Mice|Audio,gaming|mechanical keyboards
+cus_006,Ishita Nair,ishita@example.test,Chennai,professional,44200,2,Smartphones|Wearables,fitness|notifications

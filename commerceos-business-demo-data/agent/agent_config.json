@@ -1,0 +1,57 @@
+{
+  "agent_name": "NovaTech Commerce Agent",
+  "version": "1.0.0-demo",
+  "enabled_workflows": [
+    "shopping",
+    "support",
+    "growth",
+    "external_ai_buyer"
+  ],
+  "tool_permissions": {
+    "shopping": [
+      "search_products",
+      "get_product",
+      "check_inventory",
+      "add_to_cart",
+      "remove_from_cart",
+      "calculate_campaign",
+      "create_order",
+      "request_payment"
+    ],
+    "support": [
+      "get_order",
+      "search_policy",
+      "get_shipping_status"
+    ],
+    "growth": [
+      "get_analytics",
+      "analyze_products",
+      "analyze_customers",
+      "recommend_campaign"
+    ],
+    "external_ai_buyer": [
+      "search_products",
+      "get_product",
+      "check_inventory",
+      "create_cart",
+      "create_order",
+      "request_payment"
+    ]
+  },
+  "limits": {
+    "max_graph_steps": 20,
+    "max_tool_calls": 10,
+    "max_execution_seconds": 30,
+    "max_retries": 2
+  },
+  "financial_policy": {
+    "customer_confirmation_required": true,
+    "max_auto_discount_inr": 1000,
+    "max_auto_refund_inr": 500
+  },
+  "rag": {
+    "pinecone_namespace": "merchant_mrc_novatech_001",
+    "top_k": 5,
+    "min_relevance_score": 0.72
+  }
+}

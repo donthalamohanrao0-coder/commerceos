@@ -1,0 +1,357 @@
+[
+  {
+    "product_id": "prod_lap_001",
+    "sku": "NT-LAP-001",
+    "name": "NovaBook Pro 14",
+    "category": "Laptops",
+    "brand": "NovaTech",
+    "price_inr": 74999,
+    "compare_at_price_inr": 79999,
+    "stock": 18,
+    "rating": 4.7,
+    "review_count": 126,
+    "description": "14-inch productivity laptop with 16GB RAM and 512GB SSD, designed for software development and professional work.",
+    "attributes": {
+      "ram_gb": 16,
+      "storage_gb": 512,
+      "screen_inches": 14,
+      "processor": "NovaCore X5",
+      "battery_hours": 15,
+      "weight_kg": 1.38
+    },
+    "tags": [
+      "coding",
+      "student",
+      "developer",
+      "portable",
+      "work"
+    ],
+    "image_key": "laptop_01",
+    "cross_sell_ids": [
+      "prod_mouse_001",
+      "prod_hub_001",
+      "prod_keyboard_001"
+    ]
+  },
+  {
+    "product_id": "prod_lap_002",
+    "sku": "NT-LAP-002",
+    "name": "NovaBook Air 13",
+    "category": "Laptops",
+    "brand": "NovaTech",
+    "price_inr": 61999,
+    "compare_at_price_inr": 64999,
+    "stock": 24,
+    "rating": 4.5,
+    "review_count": 89,
+    "description": "Lightweight 13-inch laptop for study, office work, browsing and travel.",
+    "attributes": {
+      "ram_gb": 16,
+      "storage_gb": 512,
+      "screen_inches": 13.6,
+      "processor": "NovaCore A3",
+      "battery_hours": 17,
+      "weight_kg": 1.12
+    },
+    "tags": [
+      "student",
+      "travel",
+      "office",
+      "portable"
+    ],
+    "image_key": "laptop_01",
+    "cross_sell_ids": [
+      "prod_mouse_001",
+      "prod_hub_001"
+    ]
+  },
+  {
+    "product_id": "prod_lap_003",
+    "sku": "NT-LAP-003",
+    "name": "NovaBook Studio 15",
+    "category": "Laptops",
+    "brand": "NovaTech",
+    "price_inr": 89999,
+    "compare_at_price_inr": 94999,
+    "stock": 7,
+    "rating": 4.8,
+    "review_count": 54,
+    "description": "15-inch high-performance laptop for development, creative work and demanding multitasking.",
+    "attributes": {
+      "ram_gb": 32,
+      "storage_gb": 1024,
+      "screen_inches": 15.3,
+      "processor": "NovaCore X7",
+      "battery_hours": 13,
+      "weight_kg": 1.72
+    },
+    "tags": [
+      "developer",
+      "creative",
+      "performance",
+      "professional"
+    ],
+    "image_key": "laptop_01",
+    "cross_sell_ids": [
+      "prod_mouse_001",
+      "prod_keyboard_001",
+      "prod_hub_001"
+    ]
+  },
+  {
+    "product_id": "prod_phone_001",
+    "sku": "NT-PHN-001",
+    "name": "NovaPhone X1",
+    "category": "Smartphones",
+    "brand": "NovaTech",
+    "price_inr": 42999,
+    "compare_at_price_inr": 45999,
+    "stock": 31,
+    "rating": 4.6,
+    "review_count": 143,
+    "description": "Premium smartphone with a high-refresh display, multi-camera system and all-day battery.",
+    "attributes": {
+      "ram_gb": 12,
+      "storage_gb": 256,
+      "display_hz": 120,
+      "battery_mah": 5000,
+      "camera_mp": 50
+    },
+    "tags": [
+      "phone",
+      "camera",
+      "premium",
+      "battery"
+    ],
+    "image_key": "phone_01",
+    "cross_sell_ids": [
+      "prod_watch_001"
+    ]
+  },
+  {
+    "product_id": "prod_phone_002",
+    "sku": "NT-PHN-002",
+    "name": "NovaPhone S1",
+    "category": "Smartphones",
+    "brand": "NovaTech",
+    "price_inr": 24999,
+    "compare_at_price_inr": 26999,
+    "stock": 46,
+    "rating": 4.4,
+    "review_count": 97,
+    "description": "Balanced smartphone for everyday communication, streaming, photography and productivity.",
+    "attributes": {
+      "ram_gb": 8,
+      "storage_gb": 128,
+      "display_hz": 90,
+      "battery_mah": 5000,
+      "camera_mp": 50
+    },
+    "tags": [
+      "phone",
+      "value",
+      "everyday"
+    ],
+    "image_key": "phone_01",
+    "cross_sell_ids": [
+      "prod_watch_001"
+    ]
+  },
+  {
+    "product_id": "prod_audio_001",
+    "sku": "NT-AUD-001",
+    "name": "NovaSound Pro ANC",
+    "category": "Audio",
+    "brand": "NovaTech",
+    "price_inr": 8999,
+    "compare_at_price_inr": 10999,
+    "stock": 42,
+    "rating": 4.6,
+    "review_count": 211,
+    "description": "Over-ear wireless headphones with active noise cancellation and long battery life.",
+    "attributes": {
+      "battery_hours": 40,
+      "anc": true,
+      "bluetooth": "5.3",
+      "weight_g": 265
+    },
+    "tags": [
+      "headphones",
+      "anc",
+      "travel",
+      "work"
+    ],
+    "image_key": "headphones_01",
+    "cross_sell_ids": [
+      "prod_phone_001"
+    ]
+  },
+  {
+    "product_id": "prod_audio_002",
+    "sku": "NT-AUD-002",
+    "name": "NovaBuds Mini",
+    "category": "Audio",
+    "brand": "NovaTech",
+    "price_inr": 3999,
+    "compare_at_price_inr": 4499,
+    "stock": 65,
+    "rating": 4.3,
+    "review_count": 156,
+    "description": "Compact wireless earbuds for commuting, calls and everyday listening.",
+    "attributes": {
+      "battery_hours": 28,
+      "anc": false,
+      "bluetooth": "5.3",
+      "weight_g": 48
+    },
+    "tags": [
+      "earbuds",
+      "calls",
+      "commute"
+    ],
+    "image_key": "headphones_01",
+    "cross_sell_ids": [
+      "prod_phone_002"
+    ]
+  },
+  {
+    "product_id": "prod_keyboard_001",
+    "sku": "NT-KBD-001",
+    "name": "NovaType Mechanical 75",
+    "category": "Keyboards",
+    "brand": "NovaTech",
+    "price_inr": 5499,
+    "compare_at_price_inr": 5999,
+    "stock": 37,
+    "rating": 4.7,
+    "review_count": 118,
+    "description": "Compact mechanical keyboard with RGB backlighting and programmable controls.",
+    "attributes": {
+      "layout": "75%",
+      "switch": "linear",
+      "connection": "USB-C + wireless",
+      "backlight": "RGB"
+    },
+    "tags": [
+      "keyboard",
+      "coding",
+      "gaming",
+      "office"
+    ],
+    "image_key": "keyboard_01",
+    "cross_sell_ids": [
+      "prod_mouse_001"
+    ]
+  },
+  {
+    "product_id": "prod_mouse_001",
+    "sku": "NT-MSE-001",
+    "name": "NovaGlide Wireless Mouse",
+    "category": "Mice",
+    "brand": "NovaTech",
+    "price_inr": 1499,
+    "compare_at_price_inr": 1799,
+    "stock": 74,
+    "rating": 4.5,
+    "review_count": 204,
+    "description": "Ergonomic wireless mouse for productivity and long work sessions.",
+    "attributes": {
+      "connection": "2.4GHz + Bluetooth",
+      "dpi": 2400,
+      "buttons": 6,
+      "battery_months": 12
+    },
+    "tags": [
+      "mouse",
+      "coding",
+      "office",
+      "ergonomic"
+    ],
+    "image_key": "mouse_01",
+    "cross_sell_ids": [
+      "prod_keyboard_001"
+    ]
+  },
+  {
+    "product_id": "prod_hub_001",
+    "sku": "NT-HUB-001",
+    "name": "NovaHub 8-in-1 USB-C",
+    "category": "Accessories",
+    "brand": "NovaTech",
+    "price_inr": 2999,
+    "compare_at_price_inr": 3499,
+    "stock": 51,
+    "rating": 4.4,
+    "review_count": 72,
+    "description": "USB-C hub with HDMI, USB-A, USB-C and SD/microSD connectivity for modern laptops.",
+    "attributes": {
+      "ports": "HDMI + 2x USB-A + USB-C + SD + microSD",
+      "power_delivery_w": 100
+    },
+    "tags": [
+      "hub",
+      "usb-c",
+      "laptop",
+      "developer",
+      "travel"
+    ],
+    "image_key": "hub_01",
+    "cross_sell_ids": [
+      "prod_lap_001"
+    ]
+  },
+  {
+    "product_id": "prod_watch_001",
+    "sku": "NT-WCH-001",
+    "name": "NovaWatch Fit",
+    "category": "Wearables",
+    "brand": "NovaTech",
+    "price_inr": 6999,
+    "compare_at_price_inr": 7999,
+    "stock": 28,
+    "rating": 4.3,
+    "review_count": 63,
+    "description": "Smartwatch with fitness tracking, notifications and a bright touch display.",
+    "attributes": {
+      "battery_days": 7,
+      "water_resistance": "5ATM",
+      "display": "AMOLED"
+    },
+    "tags": [
+      "watch",
+      "fitness",
+      "notifications"
+    ],
+    "image_key": "watch_01",
+    "cross_sell_ids": [
+      "prod_phone_001"
+    ]
+  },
+  {
+    "product_id": "prod_stand_001",
+    "sku": "NT-STD-001",
+    "name": "NovaLift Aluminum Stand",
+    "category": "Accessories",
+    "brand": "NovaTech",
+    "price_inr": 2199,
+    "compare_at_price_inr": 2499,
+    "stock": 33,
+    "rating": 4.6,
+    "review_count": 48,
+    "description": "Adjustable aluminum laptop stand for a more comfortable desk setup.",
+    "attributes": {
+      "material": "aluminum",
+      "adjustable": true,
+      "max_screen_inches": 16
+    },
+    "tags": [
+      "laptop stand",
+      "desk",
+      "ergonomics"
+    ],
+    "image_key": "laptop_01",
+    "cross_sell_ids": [
+      "prod_lap_001"
+    ]
+  }
+]

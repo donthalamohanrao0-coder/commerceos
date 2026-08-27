@@ -1,0 +1,77 @@
+[project]
+name = "commerceos-backend"
+version = "0.1.0"
+description = "CommerceOS backend — FastAPI + LangGraph agent runtime"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30.0",
+    "alembic>=1.14.0",
+    "httpx>=0.27.0",
+    "langgraph>=0.2.50",
+    "langchain-core>=0.3.15",
+    "openai>=1.54.0",
+    "celery[redis]>=5.4.0",
+    "redis>=5.2.0",
+    "langfuse>=2.53.0",
+    "sentry-sdk[fastapi]>=2.17.0",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.48b0",
+    "opentelemetry-instrumentation-httpx>=0.48b0",
+    "razorpay>=1.4.2",
+    "pinecone>=5.3.1",
+    "python-json-logger>=2.0.7",
+    "orjson>=3.10.11",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.7.4",
+    "mypy>=1.13.0",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "faker>=33.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Raw SQL DDL in migrations reads better unwrapped than line-wrapped.
+"../db/migrations/versions/*.py" = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's DI pattern is `param: T = Depends(...)` — not a mutable-default bug.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query", "fastapi.Body"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+disallow_any_generics = false  # JSONB columns are typed as plain `dict` throughout
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["razorpay.*", "pythonjsonlogger.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

@@ -1,0 +1,2 @@
+# Warranty Policy
+NovaTech-branded hardware includes a 12-month limited warranty against manufacturing defects unless the product listing states otherwise. Warranty does not cover accidental damage, liquid damage, misuse, or normal wear. Warranty claims require the order reference and product serial number where applicable.

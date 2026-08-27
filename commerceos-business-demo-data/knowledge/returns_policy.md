@@ -1,0 +1,2 @@
+# Returns Policy
+Eligible products can be returned within 7 calendar days. Products should be unused and include original accessories and packaging where applicable. Final-sale products are excluded unless defective. Damaged-on-arrival claims should be reported within 48 hours with supporting photos where possible.

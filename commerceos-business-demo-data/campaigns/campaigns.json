@@ -1,0 +1,57 @@
+[
+  {
+    "campaign_id": "camp_student_10",
+    "name": "Student Tech Boost",
+    "status": "active",
+    "type": "percentage",
+    "discount_percent": 10,
+    "max_discount_inr": 1000,
+    "eligible_segments": [
+      "student"
+    ],
+    "eligible_categories": [
+      "Laptops",
+      "Audio"
+    ],
+    "requires_merchant_approval": false
+  },
+  {
+    "campaign_id": "camp_laptop_accessory",
+    "name": "Laptop Setup Bonus",
+    "status": "active",
+    "type": "fixed",
+    "discount_inr": 500,
+    "eligible_categories": [
+      "Accessories",
+      "Mice",
+      "Keyboards"
+    ],
+    "requires_merchant_approval": false,
+    "min_laptop_purchase_inr": 50000
+  },
+  {
+    "campaign_id": "camp_weekend_audio",
+    "name": "Weekend Audio Offer",
+    "status": "active",
+    "type": "percentage",
+    "discount_percent": 5,
+    "max_discount_inr": 500,
+    "eligible_categories": [
+      "Audio"
+    ],
+    "requires_merchant_approval": false
+  },
+  {
+    "campaign_id": "camp_high_value",
+    "name": "High Value Concierge",
+    "status": "draft",
+    "type": "percentage",
+    "discount_percent": 12,
+    "max_discount_inr": 5000,
+    "eligible_segments": [
+      "professional",
+      "creator"
+    ],
+    "requires_merchant_approval": true
+  }
+]

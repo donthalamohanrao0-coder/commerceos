@@ -1,0 +1,2 @@
+# Shipping Policy
+Standard delivery is 3–6 business days. Express delivery is 1–2 business days for eligible PIN codes. Standard shipping is free for orders above ₹2,000. Orders below ₹2,000 have a ₹99 shipping charge. Delivery estimates are estimates, not guarantees. Customers receive tracking when the shipment is handed to the carrier.

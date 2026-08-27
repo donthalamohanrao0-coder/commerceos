@@ -1,0 +1,105 @@
+[
+  {
+    "customer_id": "cus_001",
+    "name": "Aarav Mehta",
+    "email": "aarav@example.test",
+    "city": "Bengaluru",
+    "segment": "developer",
+    "lifetime_value_inr": 128450,
+    "orders_count": 5,
+    "preferred_categories": [
+      "Laptops",
+      "Accessories"
+    ],
+    "preferences": [
+      "coding",
+      "portable setup"
+    ]
+  },
+  {
+    "customer_id": "cus_002",
+    "name": "Diya Sharma",
+    "email": "diya@example.test",
+    "city": "Mumbai",
+    "segment": "student",
+    "lifetime_value_inr": 65998,
+    "orders_count": 2,
+    "preferred_categories": [
+      "Laptops",
+      "Audio"
+    ],
+    "preferences": [
+      "budget-conscious",
+      "study"
+    ]
+  },
+  {
+    "customer_id": "cus_003",
+    "name": "Rohan Iyer",
+    "email": "rohan@example.test",
+    "city": "Hyderabad",
+    "segment": "professional",
+    "lifetime_value_inr": 91200,
+    "orders_count": 3,
+    "preferred_categories": [
+      "Audio",
+      "Accessories"
+    ],
+    "preferences": [
+      "calls",
+      "desk setup"
+    ]
+  },
+  {
+    "customer_id": "cus_004",
+    "name": "Ananya Rao",
+    "email": "ananya@example.test",
+    "city": "Pune",
+    "segment": "creator",
+    "lifetime_value_inr": 154900,
+    "orders_count": 4,
+    "preferred_categories": [
+      "Laptops",
+      "Smartphones"
+    ],
+    "preferences": [
+      "performance",
+      "camera"
+    ]
+  },
+  {
+    "customer_id": "cus_005",
+    "name": "Kabir Singh",
+    "email": "kabir@example.test",
+    "city": "Delhi",
+    "segment": "gamer",
+    "lifetime_value_inr": 78300,
+    "orders_count": 3,
+    "preferred_categories": [
+      "Keyboards",
+      "Mice",
+      "Audio"
+    ],
+    "preferences": [
+      "gaming",
+      "mechanical keyboards"
+    ]
+  },
+  {
+    "customer_id": "cus_006",
+    "name": "Ishita Nair",
+    "email": "ishita@example.test",
+    "city": "Chennai",
+    "segment": "professional",
+    "lifetime_value_inr": 44200,
+    "orders_count": 2,
+    "preferred_categories": [
+      "Smartphones",
+      "Wearables"
+    ],
+    "preferences": [
+      "fitness",
+      "notifications"
+    ]
+  }
+]

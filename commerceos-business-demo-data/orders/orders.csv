@@ -1,0 +1,7 @@
+order_id,customer_id,status,payment_status,subtotal_inr,discount_inr,shipping_inr,total_inr,source,created_at
+ord_1001,cus_001,paid,paid,74999,1000,0,73999,ai_assisted,2026-08-20T10:14:00+05:30
+ord_1002,cus_002,paid,paid,61999,500,0,61499,customer,2026-08-20T14:20:00+05:30
+ord_1003,cus_003,paid,paid,10498,500,0,9998,ai_assisted,2026-08-21T09:45:00+05:30
+ord_1004,cus_004,paid,paid,42999,0,0,42999,customer,2026-08-21T18:10:00+05:30
+ord_1005,cus_005,paid,paid,6998,500,0,6498,ai_assisted,2026-08-22T11:32:00+05:30
+ord_1006,cus_006,payment_pending,pending,6999,0,0,6999,external_ai_buyer,2026-08-22T16:05:00+05:30

@@ -1,0 +1,13 @@
+product_id,sku,warehouse,available_qty,reserved_qty,reorder_level,status
+prod_lap_001,NT-LAP-001,BLR-01,18,0,8,in_stock
+prod_lap_002,NT-LAP-002,BLR-01,24,0,8,in_stock
+prod_lap_003,NT-LAP-003,BLR-01,7,0,8,in_stock
+prod_phone_001,NT-PHN-001,BLR-01,31,0,8,in_stock
+prod_phone_002,NT-PHN-002,BLR-01,46,0,8,in_stock
+prod_audio_001,NT-AUD-001,BLR-01,42,0,8,in_stock
+prod_audio_002,NT-AUD-002,BLR-01,65,0,8,in_stock
+prod_keyboard_001,NT-KBD-001,BLR-01,37,0,8,in_stock
+prod_mouse_001,NT-MSE-001,BLR-01,74,0,8,in_stock
+prod_hub_001,NT-HUB-001,BLR-01,51,0,8,in_stock
+prod_watch_001,NT-WCH-001,BLR-01,28,0,8,in_stock
+prod_stand_001,NT-STD-001,BLR-01,33,0,8,in_stock

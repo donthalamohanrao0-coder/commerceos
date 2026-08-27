@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Node / frontend
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# uv / pnpm (lockfiles ARE kept for reproducibility — do not ignore uv.lock / pnpm-lock.yaml)

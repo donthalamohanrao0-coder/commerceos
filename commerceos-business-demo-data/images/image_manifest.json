@@ -1,0 +1,56 @@
+{
+  "laptop_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/laptop-on-white-table-Gi3iUJ1FwxI",
+    "image_url": "https://unsplash.com/photos/laptop-on-white-table-Gi3iUJ1FwxI",
+    "note": "Use the Unsplash photo page/official API to obtain the current image URL. Free to use under Unsplash License."
+  },
+  "keyboard_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/a-black-mechanical-keyboard-with-rgb-lighting-Gmoqo0u2ucY",
+    "image_url": "https://images.unsplash.com/photo-1634306625640-04ac053e544b?auto=format&blend=000000&blend-alpha=10&blend-mode=normal&blend-w=1&crop=faces%2Cedges&fit=crop&h=630&q=60&w=1200",
+    "photographer": "Marcus Richardson",
+    "license": "Unsplash License"
+  },
+  "mouse_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/black-wireless-mouse-on-black-textile-Gcc87LTQXDg",
+    "image_url": "https://images.unsplash.com/photo-1554576575-a4e7b6e8409d?auto=format&fit=crop&fm=jpg&q=85&w=1200",
+    "photographer": "Ricardo Resende",
+    "license": "Unsplash License"
+  },
+  "mouse_white_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/a-white-wireless-mouse-is-on-a-yellow-background-x02zblevcqs",
+    "image_url": "https://unsplash.com/photos/a-white-wireless-mouse-is-on-a-yellow-background-x02zblevcqs",
+    "photographer": "Andrey Matveev",
+    "license": "Unsplash License"
+  },
+  "headphones_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/black-and-blue-wireless-headphones-xuioQR0qrHY",
+    "image_url": "https://unsplash.com/photos/black-and-blue-wireless-headphones-xuioQR0qrHY",
+    "photographer": "YearOne",
+    "license": "Unsplash License"
+  },
+  "phone_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/smartphone-and-stylus-on-a-desk-with-keyboard-and-mouse-sh28UJrbBts",
+    "image_url": "https://unsplash.com/photos/smartphone-and-stylus-on-a-desk-with-keyboard-and-mouse-sh28UJrbBts",
+    "photographer": "Grabster",
+    "license": "Unsplash License"
+  },
+  "watch_01": {
+    "source": "Unsplash",
+    "source_page": "https://unsplash.com/photos/smartwatch-with-colorful-app-icons-on-screen-zfsL3hrHm9U",
+    "image_url": "https://unsplash.com/photos/smartwatch-with-colorful-app-icons-on-screen-zfsL3hrHm9U",
+    "photographer": "GALINA BOGDANOVA",
+    "license": "Unsplash License"
+  },
+  "hub_01": {
+    "source": "Other free stock reference",
+    "source_page": "https://unsplash.com/",
+    "image_url": "https://unsplash.com/s/photos/usb-c-hub",
+    "note": "Prefer replacing with a merchant-owned or properly licensed product image before production."
+  }
+}
