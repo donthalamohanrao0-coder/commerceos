@@ -1,29 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 
-import { Badge, Card, Skeleton } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
 import { PageHeader, QueryBoundary, StatCard } from "@/features/console/Shared";
 import { useApprovals, useAudit, useMetrics } from "@/features/console/hooks";
 import { clockTime, relativeTime, rupees } from "@/lib/format";
-
-const Analytics = dynamic(
-  () => import("@/features/console/Analytics").then((m) => m.Analytics),
-  {
-    ssr: false,
-    loading: () => (
-      <section className="mt-8">
-        <h2 className="mb-3 text-sm font-semibold">Analytics</h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-60 w-full" />
-          ))}
-        </div>
-      </section>
-    ),
-  },
-);
 
 export default function OverviewPage() {
   const metrics = useMetrics();
@@ -34,10 +16,18 @@ export default function OverviewPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Overview"
-        description="Authoritative revenue figures and the agent audit trail for this merchant."
-      />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeader
+          title="Overview"
+          description="Authoritative revenue figures and the agent audit trail for this merchant."
+        />
+        <Link
+          href="/console/analytics"
+          className="mt-1 shrink-0 rounded-full border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-fg)]"
+        >
+          View analytics →
+        </Link>
+      </div>
 
       {pendingCount > 0 && (
         <Link
@@ -152,8 +142,6 @@ export default function OverviewPage() {
           )}
         </QueryBoundary>
       </section>
-
-      <Analytics />
     </div>
   );
 }

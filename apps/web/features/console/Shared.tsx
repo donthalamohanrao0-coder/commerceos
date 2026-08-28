@@ -13,6 +13,34 @@ export function PageHeader({ title, description }: { title: string; description:
   );
 }
 
+/** One filter/selector pill. Used for range, workflow and doc-type selectors so
+ * they all look and behave the same. */
+export function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={
+        "rounded-full border px-3 py-1 text-xs transition-colors " +
+        (active
+          ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
+          : "border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-fg)]")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
 export interface Column<T> {
   key: string;
   header: string;

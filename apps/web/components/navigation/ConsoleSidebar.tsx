@@ -7,7 +7,10 @@ import { usePathname } from "next/navigation";
 const groups: { label: string; items: { href: string; label: string; exact?: boolean }[] }[] = [
   {
     label: "Overview",
-    items: [{ href: "/console", label: "Overview", exact: true }],
+    items: [
+      { href: "/console", label: "Overview", exact: true },
+      { href: "/console/analytics", label: "Analytics" },
+    ],
   },
   {
     label: "Commerce",

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 
 import { Badge, Button, Card, EmptyState, Field } from "@/components/ui";
 import {
+  Chip,
   DataTable,
   PageHeader,
   QueryBoundary,
@@ -249,19 +250,13 @@ export default function KnowledgePage() {
                 />
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {FILTERS.map((f) => (
-                    <button
+                    <Chip
                       key={f.label}
-                      type="button"
+                      active={docType === f.value}
                       onClick={() => setDocType(f.value)}
-                      className={
-                        "rounded-full border px-3 py-1 text-xs transition-colors " +
-                        (docType === f.value
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
-                          : "border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-muted)]")
-                      }
                     >
                       {f.label}
-                    </button>
+                    </Chip>
                   ))}
                   <Button
                     className="ml-auto"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -15,7 +16,7 @@ import {
 } from "recharts";
 
 import { Card } from "@/components/ui";
-import { QueryBoundary } from "@/features/console/Shared";
+import { Chip, PageHeader, QueryBoundary, StatCard } from "@/features/console/Shared";
 import { useAnalytics } from "@/features/console/hooks";
 import { rupees } from "@/lib/format";
 import type { ConsoleAnalytics } from "@/lib/types";
@@ -37,14 +38,21 @@ const STATUS_COLOR: Record<string, string> = {
   failed: "#b3261e",
   cancelled: "#b3261e",
 };
-
 const SOURCE_LABEL: Record<string, string> = {
   ai_assisted: "In-app agent",
   customer: "Customer",
   external_ai_buyer: "AI buyer",
 };
 
-function ChartCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function ChartCard({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <Card className="p-4">
       <div className="mb-2 flex items-baseline justify-between">
@@ -210,17 +218,46 @@ function Charts({ data }: { data: ConsoleAnalytics }) {
   );
 }
 
-export function Analytics() {
-  const analytics = useAnalytics(45);
+const RANGES = [30, 45, 90] as const;
+
+/** Full-page analytics: KPI row + range selector + the chart grid. */
+export function AnalyticsPage() {
+  const [days, setDays] = useState<number>(45);
+  const analytics = useAnalytics(days);
+
   return (
-    <section className="mt-8">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold">Analytics</h2>
-        <span className="text-xs text-[var(--color-fg-muted)]">rolling 45 days</span>
+    <div>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <PageHeader
+          title="Analytics"
+          description="Revenue, orders and channel mix over a rolling window. Figures are computed from orders, not anything the agent reported."
+        />
+        <div className="flex shrink-0 gap-1 pt-1">
+          {RANGES.map((r) => (
+            <Chip key={r} active={days === r} onClick={() => setDays(r)}>
+              {r}d
+            </Chip>
+          ))}
+        </div>
       </div>
-      <QueryBoundary query={analytics} skeletonRows={4}>
-        {(d) => <Charts data={d} />}
+
+      <QueryBoundary query={analytics} skeletonRows={5}>
+        {(d) => (
+          <>
+            <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatCard
+                label={`Revenue · ${d.window_days}d`}
+                value={rupees(d.summary.revenue_paise)}
+                hint="paid + fulfilled"
+              />
+              <StatCard label="Orders" value={String(d.summary.order_count)} />
+              <StatCard label="Paid orders" value={String(d.summary.paid_order_count)} />
+              <StatCard label="Avg order value" value={rupees(d.summary.aov_paise)} />
+            </div>
+            <Charts data={d} />
+          </>
+        )}
       </QueryBoundary>
-    </section>
+    </div>
   );
 }

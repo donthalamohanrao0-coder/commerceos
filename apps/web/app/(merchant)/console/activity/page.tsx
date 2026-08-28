@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { SessionTrace } from "@/features/console/SessionTrace";
-import { PageHeader, QueryBoundary } from "@/features/console/Shared";
+import { Chip, PageHeader, QueryBoundary } from "@/features/console/Shared";
 import { useActivity } from "@/features/console/hooks";
 import { clockTime, relativeTime } from "@/lib/format";
 import type { ActivitySession } from "@/lib/types";
@@ -66,18 +66,9 @@ export default function ActivityPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-xs text-[var(--color-fg-muted)]">Workflow:</span>
         {["all", ...workflows].map((w) => (
-          <button
-            key={w}
-            type="button"
-            onClick={() => setWorkflow(w)}
-            className={`rounded-full px-2.5 py-1 text-xs transition-colors ${
-              workflow === w
-                ? "bg-[var(--color-primary)] text-[var(--color-primary-fg)]"
-                : "border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-muted)]"
-            }`}
-          >
+          <Chip key={w} active={workflow === w} onClick={() => setWorkflow(w)}>
             {w}
-          </button>
+          </Chip>
         ))}
       </div>
 

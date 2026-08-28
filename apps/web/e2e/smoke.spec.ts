@@ -79,7 +79,8 @@ test.describe("merchant console", () => {
     await expect(page.getByText(/^Revenue$/)).toBeVisible();
     await expect(page.getByRole("heading", { name: /^audit trail$/i })).toBeVisible();
 
-    // analytics section renders its charts (lazy-loaded)
+    // analytics is its own page — charts render there (lazy-loaded)
+    await page.goto("/console/analytics");
     await expect(page.getByRole("heading", { name: /^analytics$/i })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator(".recharts-surface").first()).toBeVisible({ timeout: 30_000 });
 
