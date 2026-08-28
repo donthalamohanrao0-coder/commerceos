@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     celery_result_backend: str | None = None
 
     cors_allow_origins: list[str] = ["http://localhost:3000"]
+    # Vercel gives every deployment its own *.vercel.app host; allow them all by
+    # default so preview + production URLs work without re-listing each one.
+    cors_allow_origin_regex: str | None = r"https://.*\.vercel\.app"
 
     # Frontend / demo wiring. A first-time authenticated user is auto-linked to
     # this merchant (see IdentityService); production replaces this with onboarding.
