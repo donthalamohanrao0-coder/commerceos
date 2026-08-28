@@ -9,6 +9,7 @@ vectors, so a namespace never accumulates stale chunks.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import uuid
 from dataclasses import dataclass
@@ -97,7 +98,8 @@ class KnowledgeIngestionService:
         next_version = (prior_versions[0].version_number + 1) if prior_versions else 1
 
         # --- embed + upsert vectors ----------------------------------------
-        vectors = self._embed.embed([c.text for c in chunks])
+        # blocking HTTP (OpenAI + Pinecone) — off the event loop
+        vectors = await asyncio.to_thread(self._embed.embed, [c.text for c in chunks])
         now = datetime.now(UTC)
         records = [
             VectorRecord(
@@ -120,7 +122,7 @@ class KnowledgeIngestionService:
             )
             for c in chunks
         ]
-        self._index.upsert(namespace=namespace, records=records)
+        await asyncio.to_thread(self._index.upsert, namespace=namespace, records=records)
 
         # --- Postgres: version bookkeeping --------------------------------
         await self._session.execute(

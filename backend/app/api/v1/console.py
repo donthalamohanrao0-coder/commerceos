@@ -9,11 +9,13 @@ approval endpoint (``POST /agent/sessions/{id}/approvals/{approval_id}``), so th
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,11 +33,13 @@ from app.domains.merchants.models import Merchant
 from app.domains.orders.models import Order, OrderItem
 from app.domains.payments.models import Payment
 from app.identity.service import MerchantIdentity
+from app.knowledge.ingestion.pipeline import KnowledgeIngestionService
 from app.knowledge.models import Document, DocumentVersion
 from app.knowledge.retrieval.retriever import KnowledgeRetriever
 from app.policies.models import Policy
 
 router = APIRouter(prefix="/console", tags=["console"])
+_log = logging.getLogger(__name__)
 
 _IDENTITY = Depends(get_merchant_identity)
 _SESSION = Depends(get_identity_tenant_session)
@@ -857,6 +861,76 @@ async def knowledge_documents(
                 "chunk_count": total_chunks,
                 "retrieval_calls": retrievals,
             },
+        }
+    )
+
+
+_KB_MAX_BYTES = 300_000
+_KB_TYPES = ("merchant_policy", "faq_or_guide")
+
+
+def _doc_key(name: str) -> str:
+    stem = re.sub(r"\.(md|markdown|txt)$", "", name.strip(), flags=re.IGNORECASE)
+    slug = re.sub(r"[^a-z0-9]+", "_", stem.lower()).strip("_")
+    return slug or "document"
+
+
+@router.post("/knowledge", status_code=201)
+async def upload_knowledge_document(
+    file: UploadFile = File(...),
+    title: str = Form(..., min_length=2, max_length=200),
+    document_type: str = Form(...),
+    identity: MerchantIdentity = _IDENTITY,
+    session: AsyncSession = _SESSION,
+) -> dict:
+    """Ingest a markdown/text file into this merchant's vector namespace — the same
+    pipeline as the CLI seeder (semantic chunks → embeddings → Pinecone + a
+    versioned Postgres audit row). Re-uploading the same filename creates a new
+    version and drops the old vectors."""
+    if document_type not in _KB_TYPES:
+        raise HTTPException(status_code=422, detail=f"document_type must be one of {_KB_TYPES}")
+
+    raw_bytes = await file.read()
+    if len(raw_bytes) > _KB_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="file is larger than 300 KB")
+    text = raw_bytes.decode("utf-8", errors="replace").strip()
+    if len(text) < 20:
+        raise HTTPException(status_code=422, detail="file has no usable text")
+
+    key = _doc_key(file.filename or title)
+    try:
+        async with session.begin():
+            merchant = await session.get(Merchant, identity.merchant_id)
+            if merchant is None or not merchant.pinecone_namespace:
+                raise HTTPException(status_code=409, detail="merchant has no knowledge namespace")
+            result = await KnowledgeIngestionService(session).ingest_markdown(
+                merchant_id=identity.merchant_id,
+                merchant_code=merchant.merchant_code,
+                namespace=merchant.pinecone_namespace,
+                document_key=key,
+                title=title.strip(),
+                document_type=document_type,
+                source_path=f"upload/{key}.md",
+                raw_text=text,
+            )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001 — embedding / vector store outage
+        _log.exception("knowledge upload failed for merchant %s", identity.merchant_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Indexing failed — check the embedding / vector store connection.",
+        ) from exc
+
+    return ok(
+        {
+            "document_id": str(result.document_id),
+            "document_key": result.document_key,
+            "version_number": result.version_number,
+            "chunk_count": result.chunk_count,
+            "namespace": result.namespace,
         }
     )
 
