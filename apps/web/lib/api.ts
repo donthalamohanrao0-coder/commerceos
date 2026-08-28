@@ -78,6 +78,42 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return ((payload as { data?: T } | null)?.data ?? (payload as T)) as T;
 }
 
+/** Authenticated multipart POST (file uploads). The browser sets the boundary,
+ * so we must NOT send a Content-Type header. Same envelope unwrap as `api`. */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${config.apiBaseUrl}${path}`, {
+      method: "POST",
+      headers: { ...(await authHeader()) },
+      body: form,
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError(0, "NETWORK", "Could not reach the server. Check your connection.");
+  }
+
+  let payload: unknown = null;
+  const text = await response.text();
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+  }
+  if (!response.ok) {
+    const detail =
+      (payload as { detail?: string; error?: { message?: string } } | null) ?? null;
+    throw new ApiError(
+      response.status,
+      "UPLOAD",
+      detail?.error?.message ?? detail?.detail ?? `HTTP ${response.status}`,
+    );
+  }
+  return ((payload as { data?: T } | null)?.data ?? (payload as T)) as T;
+}
+
 /** Authenticated POST that returns the raw streaming `Response` (for SSE). */
 export async function apiStream(path: string, body: unknown): Promise<Response> {
   let response: Response;

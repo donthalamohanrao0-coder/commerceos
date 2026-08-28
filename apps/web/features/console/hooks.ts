@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api } from "@/lib/api";
+import { api, apiUpload } from "@/lib/api";
 import type {
   ActivityDetail,
   ActivitySession,
@@ -120,6 +120,24 @@ export function useKnowledgePreview() {
   return useMutation({
     mutationFn: (body: { query: string; document_type?: string | null }) =>
       api<KnowledgePreview>("/console/knowledge/preview", { method: "POST", body }),
+  });
+}
+
+export function useUploadKnowledge() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { file: File; title: string; documentType: string }) => {
+      const fd = new FormData();
+      fd.append("file", input.file);
+      fd.append("title", input.title);
+      fd.append("document_type", input.documentType);
+      return apiUpload<{
+        document_id: string;
+        chunk_count: number;
+        version_number: number;
+      }>("/console/knowledge", fd);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["console", "knowledge"] }),
   });
 }
 

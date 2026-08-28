@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { Badge, Button, Card, EmptyState } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Field } from "@/components/ui";
 import {
   DataTable,
   PageHeader,
@@ -10,7 +10,11 @@ import {
   StatCard,
   type Column,
 } from "@/features/console/Shared";
-import { useKnowledge, useKnowledgePreview } from "@/features/console/hooks";
+import {
+  useKnowledge,
+  useKnowledgePreview,
+  useUploadKnowledge,
+} from "@/features/console/hooks";
 import { relativeTime } from "@/lib/format";
 import type { KnowledgeChunk, KnowledgeDocument } from "@/lib/types";
 
@@ -100,6 +104,88 @@ function ChunkResult({ chunk, rank, topScore }: { chunk: KnowledgeChunk; rank: n
       <p className="mt-3 whitespace-pre-wrap border-l-2 border-[var(--color-border)] pl-3 text-sm text-[var(--color-fg-muted)]">
         {chunk.text}
       </p>
+    </Card>
+  );
+}
+
+function UploadCard() {
+  const upload = useUploadKnowledge();
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [documentType, setDocumentType] = useState("merchant_policy");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file || title.trim().length < 2) return;
+    upload.mutate(
+      { file, title: title.trim(), documentType },
+      {
+        onSuccess: () => {
+          setFile(null);
+          setTitle("");
+          if (inputRef.current) inputRef.current.value = "";
+        },
+      },
+    );
+  }
+
+  return (
+    <Card className="p-4">
+      <h3 className="text-sm font-semibold">Add a document</h3>
+      <p className="mt-1 text-sm text-[var(--color-fg-muted)]">
+        A markdown or text file (≤300&nbsp;KB). It&apos;s chunked, embedded and indexed into
+        this merchant&apos;s vector namespace — the agent can cite it immediately.
+      </p>
+      <form onSubmit={submit} className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-sm sm:col-span-2">
+          <span className="font-medium">File</span>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="text-sm file:mr-3 file:rounded-[var(--radius-input)] file:border-0 file:bg-[var(--color-surface-muted)] file:px-3 file:py-1.5 file:text-sm file:font-medium"
+          />
+        </label>
+        <Field
+          label="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. Bulk & business orders"
+        />
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium">Type</span>
+          <select
+            value={documentType}
+            onChange={(e) => setDocumentType(e.target.value)}
+            className="rounded-[var(--radius-input)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm"
+          >
+            <option value="merchant_policy">Policy</option>
+            <option value="faq_or_guide">FAQ / guide</option>
+          </select>
+        </label>
+        <div className="flex items-center gap-3 sm:col-span-2">
+          <Button
+            type="submit"
+            loading={upload.isPending}
+            disabled={!file || title.trim().length < 2}
+          >
+            Upload &amp; index
+          </Button>
+          {upload.isSuccess && (
+            <span className="text-sm text-[var(--color-success)]">
+              Indexed — {upload.data.chunk_count} chunk
+              {upload.data.chunk_count === 1 ? "" : "s"} (v{upload.data.version_number}).
+            </span>
+          )}
+          {upload.isError && (
+            <span className="text-sm text-[var(--color-danger)]">
+              {upload.error instanceof Error ? upload.error.message : "Upload failed."}
+            </span>
+          )}
+        </div>
+      </form>
     </Card>
   );
 }
@@ -216,15 +302,20 @@ export default function KnowledgePage() {
             </section>
 
             <section className="mt-8">
-              <h2 className="mb-3 text-sm font-semibold">Documents</h2>
-              {d.documents.length === 0 ? (
-                <EmptyState
-                  title="No documents indexed"
-                  description="Run the knowledge ingestion script to populate the corpus."
-                />
-              ) : (
-                <DataTable columns={columns} rows={d.documents} rowKey={(x) => x.id} />
-              )}
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Documents</h2>
+              </div>
+              <div className="space-y-4">
+                <UploadCard />
+                {d.documents.length === 0 ? (
+                  <EmptyState
+                    title="No documents indexed"
+                    description="Upload a file above, or run the ingestion script to seed the corpus."
+                  />
+                ) : (
+                  <DataTable columns={columns} rows={d.documents} rowKey={(x) => x.id} />
+                )}
+              </div>
             </section>
           </>
         )}
