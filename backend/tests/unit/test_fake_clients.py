@@ -4,6 +4,8 @@ pin their behaviour."""
 import json
 import math
 
+import pytest
+
 from app.integrations.openai.chat import ChatMessage, FakeChatClient, ToolSpec
 from app.integrations.openai.embeddings import FakeEmbeddingClient
 
@@ -22,16 +24,18 @@ def _tools(*names: str) -> list[ToolSpec]:
     return [ToolSpec(name=n, description=n, parameters={"type": "object"}) for n in names]
 
 
-def test_fake_chat_planner_runs_a_policy_question() -> None:
+@pytest.mark.asyncio
+async def test_fake_chat_planner_runs_a_policy_question() -> None:
     client = FakeChatClient()
-    result = client.complete(
+    result = await client.complete(
         messages=[ChatMessage(role="user", content="what is your return policy?")],
         tools=_tools("knowledge_search", "catalog_search"),
     )
     assert result.tool_calls and result.tool_calls[0].name == "knowledge_search"
 
 
-def test_fake_chat_planner_drives_the_buy_flow_in_order() -> None:
+@pytest.mark.asyncio
+async def test_fake_chat_planner_drives_the_buy_flow_in_order() -> None:
     client = FakeChatClient()
     tools = _tools(
         "catalog_search", "cart_add_item", "campaign_preview", "order_create", "payment_request"
@@ -47,7 +51,7 @@ def test_fake_chat_planner_drives_the_buy_flow_in_order() -> None:
 
     seen: list[str] = []
     for _ in range(8):
-        res = client.complete(messages=transcript, tools=tools)
+        res = await client.complete(messages=transcript, tools=tools)
         if not res.tool_calls:
             break
         call = res.tool_calls[0]

@@ -2,6 +2,8 @@ import pytest
 
 from app.agents.supervisor import classify_workflow
 
+pytestmark = pytest.mark.asyncio
+
 
 @pytest.mark.parametrize(
     ("text", "expected"),
@@ -16,16 +18,19 @@ from app.agents.supervisor import classify_workflow
         ("", "shopping"),  # empty -> safe default
     ],
 )
-def test_keyword_routing(text: str, expected: str) -> None:
-    assert classify_workflow(text) == expected
+async def test_keyword_routing(text: str, expected: str) -> None:
+    assert await classify_workflow(text) == expected
 
 
-def test_llm_refinement_is_optional_and_safe() -> None:
+async def test_llm_refinement_is_optional_and_safe() -> None:
     class _BrokenClient:
         model = "broken"
 
-        def complete(self, **_: object) -> object:
+        async def complete(self, **_: object) -> object:
             raise RuntimeError("no network")
 
     # weak keyword signal + broken client must still return a valid default
-    assert classify_workflow("hello there", chat_client=_BrokenClient()) == "shopping"  # type: ignore[arg-type]
+    assert (
+        await classify_workflow("hello there", chat_client=_BrokenClient())  # type: ignore[arg-type]
+        == "shopping"
+    )

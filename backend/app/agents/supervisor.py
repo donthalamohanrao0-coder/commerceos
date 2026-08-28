@@ -7,8 +7,9 @@ an LLM can refine it when a client is supplied and the keyword signal is weak.
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Literal, cast
 
+from app.core.cache import cache_get, cache_key, cache_set
 from app.integrations.openai.chat import ChatClient, ChatMessage
 
 Workflow = Literal["shopping", "support", "growth"]
@@ -25,14 +26,18 @@ _SUPPORT = re.compile(
 )
 
 
-def classify_workflow(text: str, *, chat_client: ChatClient | None = None) -> Workflow:
+async def classify_workflow(text: str, *, chat_client: ChatClient | None = None) -> Workflow:
     if _GROWTH.search(text):
         return "growth"
     if _SUPPORT.search(text):
         return "support"
-    if chat_client is not None:
+    if chat_client is not None and text.strip():
+        key = cache_key("workflow", text.strip().lower())
+        cached = await cache_get(key)
+        if cached in ("shopping", "support", "growth"):
+            return cast(Workflow, cached)
         try:
-            result = chat_client.complete(
+            result = await chat_client.complete(
                 messages=[
                     ChatMessage(
                         role="system",
@@ -47,7 +52,8 @@ def classify_workflow(text: str, *, chat_client: ChatClient | None = None) -> Wo
             )
             label = (result.content or "").strip().lower()
             if label in ("shopping", "support", "growth"):
-                return label  # type: ignore[return-value]
+                await cache_set(key, label, ttl_seconds=3600)
+                return cast(Workflow, label)
         except Exception:  # never let routing fail the request
             pass
     return "shopping"

@@ -96,7 +96,7 @@ def build_agent_graph(
         gen = span.child(
             name="llm.plan", kind="generation", input={"model": chat_client.model, "step": step}
         )
-        result = chat_client.complete(messages=messages, tools=specs)
+        result = await chat_client.complete(messages=messages, tools=specs)
         gen.end(
             output={
                 "tool_calls": [tc.name for tc in result.tool_calls],

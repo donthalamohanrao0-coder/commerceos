@@ -8,6 +8,7 @@ approval endpoint (``POST /agent/sessions/{id}/approvals/{approval_id}``), so th
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -879,7 +880,8 @@ async def knowledge_preview(
         raise HTTPException(status_code=409, detail="merchant has no knowledge namespace")
 
     try:
-        chunks = KnowledgeRetriever().retrieve(
+        chunks = await asyncio.to_thread(
+            KnowledgeRetriever().retrieve,
             namespace=namespace,
             query=body.query,
             document_type=body.document_type,

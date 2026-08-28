@@ -69,7 +69,9 @@ async def start_session(
 ) -> dict:
     workflow = body.workflow
     if workflow == "auto":
-        workflow = classify_workflow(body.first_message or "", chat_client=get_chat_client())
+        workflow = await classify_workflow(
+            body.first_message or "", chat_client=get_chat_client()
+        )
     service_cls = _SERVICES[workflow]
     async with session.begin():
         agent_session = await service_cls(session).start_session(

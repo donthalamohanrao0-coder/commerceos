@@ -51,7 +51,7 @@ class ChatResult:
 class ChatClient(Protocol):
     model: str
 
-    def complete(
+    async def complete(
         self, *, messages: list[ChatMessage], tools: list[ToolSpec], temperature: float = 0.2
     ) -> ChatResult: ...
 
@@ -61,12 +61,12 @@ class ChatClient(Protocol):
 
 class OpenAIChatClient:
     def __init__(self, api_key: str, model: str) -> None:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
 
-        self._client = OpenAI(api_key=api_key)
+        self._client = AsyncOpenAI(api_key=api_key)
         self.model = model
 
-    def complete(
+    async def complete(
         self, *, messages: list[ChatMessage], tools: list[ToolSpec], temperature: float = 0.2
     ) -> ChatResult:
         payload: list[dict[str, Any]] = []
@@ -113,7 +113,8 @@ class OpenAIChatClient:
                 }
                 for t in tools
             ]
-        choice = self._client.chat.completions.create(**kwargs).choices[0].message
+        completion = await self._client.chat.completions.create(**kwargs)
+        choice = completion.choices[0].message
         calls = tuple(
             ToolCall(
                 id=tc.id,
@@ -141,7 +142,7 @@ class FakeChatClient:
         self._counter[call_id] = self._counter.get(call_id, 0) + 1
         return f"call_{call_id}_{self._counter[call_id]}"
 
-    def complete(
+    async def complete(
         self, *, messages: list[ChatMessage], tools: list[ToolSpec], temperature: float = 0.2
     ) -> ChatResult:
         names = {t.name for t in tools}

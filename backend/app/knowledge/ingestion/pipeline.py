@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_bump
 from app.core.config import get_settings
 from app.integrations.openai.embeddings import EmbeddingClient, get_embedding_client
 from app.integrations.pinecone.client import VectorIndex, VectorRecord, get_vector_index
@@ -154,6 +155,9 @@ class KnowledgeIngestionService:
                         for i in range(old.chunk_count)
                     ],
                 )
+
+        # invalidate this merchant's cached retrieval results
+        await cache_bump(f"kb:{namespace}")
 
         return IngestionResult(
             document_id=document.id,
