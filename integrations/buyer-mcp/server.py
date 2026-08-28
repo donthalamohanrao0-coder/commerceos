@@ -17,8 +17,10 @@ Env:
 
 from __future__ import annotations
 
+import hmac
 import logging
 import os
+import sys
 import uuid
 from typing import Any
 
@@ -188,24 +190,70 @@ async def _healthz(_request):  # noqa: ANN001, ANN202
     return PlainTextResponse("ok")
 
 
+class _BearerAuth:
+    """ASGI wrapper: require `Authorization: Bearer <MCP_AUTH_TOKEN>` on the MCP
+    endpoint. `/healthz` and everything else stays open (Render's health check
+    can't send headers). Lifespan/websocket scopes pass straight through."""
+
+    def __init__(self, inner: Any, *, token: str, mcp_path: str) -> None:
+        self.inner = inner
+        self.token = token
+        self.guard = mcp_path.rstrip("/")
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http" and scope.get("path", "").rstrip("/") == self.guard:
+            headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+            auth = headers.get("authorization", "")
+            presented = auth[7:] if auth[:7].lower() == "bearer " else ""
+            if not hmac.compare_digest(presented, self.token):
+                from starlette.responses import JSONResponse
+
+                resp = JSONResponse(
+                    {"error": "unauthorized", "detail": "missing or invalid bearer token"},
+                    status_code=401,
+                    headers={"WWW-Authenticate": 'Bearer realm="commerceos-buyer"'},
+                )
+                await resp(scope, receive, send)
+                return
+        await self.inner(scope, receive, send)
+
+
+def _http_app() -> Any:
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    # Hosted behind HTTPS on a fixed domain; the localhost-only DNS-rebinding
+    # guard would otherwise 421 every request from a remote client.
+    mcp.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    )
+    # Optional: serve the endpoint at a hard-to-guess path instead of /mcp.
+    secret = os.environ.get("MCP_URL_SECRET", "").strip("/")
+    if secret:
+        mcp.settings.streamable_http_path = f"/{secret}"
+
+    app = mcp.streamable_http_app()
+
+    token = os.environ.get("MCP_AUTH_TOKEN", "").strip()
+    if token:
+        return _BearerAuth(app, token=token, mcp_path=mcp.settings.streamable_http_path)
+    print(
+        "WARNING: MCP_AUTH_TOKEN is not set — the MCP endpoint is UNAUTHENTICATED.",
+        file=sys.stderr,
+    )
+    return app
+
+
 def _run() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
     if transport in ("http", "streamable-http", "streamable_http"):
-        from mcp.server.transport_security import TransportSecuritySettings
+        import uvicorn
 
-        # Hosted behind HTTPS on a fixed domain; the localhost-only DNS-rebinding
-        # guard would otherwise 421 every request from claude.ai.
-        mcp.settings.transport_security = TransportSecuritySettings(
-            enable_dns_rebinding_protection=False
+        uvicorn.run(
+            _http_app(),
+            host="0.0.0.0",  # noqa: S104 — bind for the platform's proxy
+            port=int(os.environ.get("PORT", "8080")),
+            log_level="info",
         )
-        mcp.settings.host = "0.0.0.0"  # noqa: S104 — bind for the platform's proxy
-        mcp.settings.port = int(os.environ.get("PORT", "8080"))
-        # Optional: serve the endpoint at a hard-to-guess path instead of /mcp.
-        # The connector has no auth field, so a secret path is the cheapest guard.
-        secret = os.environ.get("MCP_URL_SECRET", "").strip("/")
-        if secret:
-            mcp.settings.streamable_http_path = f"/{secret}"
-        mcp.run(transport="streamable-http")  # endpoint: https://<host>/mcp
     else:
         mcp.run()  # stdio: Claude Desktop / Claude Code
 

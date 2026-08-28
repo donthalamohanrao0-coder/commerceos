@@ -93,52 +93,68 @@ uv run python -c "import server; print(server.search_catalog(query='mouse', limi
 
 ---
 
-## Remote (HTTP) transport — for claude.ai / ChatGPT connectors
+## Remote (HTTP) transport
 
 The same `server.py` speaks **streamable-http** when `MCP_TRANSPORT=http`. Endpoint
-is `https://<host>/mcp` (or `/<MCP_URL_SECRET>` if that env var is set). `GET
-/healthz` returns `ok`.
+is `https://<host>/mcp` (or `/<MCP_URL_SECRET>`); `GET /healthz` returns `ok`.
+
+### Authentication
+
+Set **`MCP_AUTH_TOKEN`** and the server requires `Authorization: Bearer <that>` on
+the MCP endpoint — every other request gets `401`. `/healthz` stays open (for the
+platform health check). Generate one: `openssl rand -hex 32`.
+
+| Client | Sends the bearer? | How |
+|--------|-------------------|-----|
+| **Claude Code** | ✅ | `claude mcp add --transport http commerceos-buyer https://<host>/mcp --header "Authorization: Bearer <token>"` |
+| **Claude Desktop** | ✅ | server entry with `"headers": {"Authorization": "Bearer <token>"}` |
+| **Claude API** (`mcp_servers`) | ✅ | `"authorization_token": "<token>"` |
+| **claude.ai web connector** | ❌ | UI has only OAuth fields — no header. Use `MCP_URL_SECRET` (obscure path) instead, or front the server with an OAuth provider (WorkOS AuthKit / Stytch / Descope). |
+
+`MCP_URL_SECRET` (serve at `/<string>` not `/mcp`) is independent — use it *with*
+the token for defence in depth, or *instead of* it for claude.ai web.
 
 ### Run it locally over HTTP
 
 ```bash
-MCP_TRANSPORT=http PORT=8080 \
+MCP_TRANSPORT=http PORT=8080 MCP_AUTH_TOKEN=$(openssl rand -hex 32) \
 AGENT_COMMERCE_BASE_URL=https://commerceos.onrender.com/api/v1/agent-commerce \
 AGENT_COMMERCE_KEY=ack_live_xxxxxxxxxxxxxxxxxxxx \
 uv run server.py
 
 curl -s http://localhost:8080/healthz            # -> ok
-npx @modelcontextprotocol/inspector             # transport "Streamable HTTP" -> http://localhost:8080/mcp
+npx @modelcontextprotocol/inspector             # Streamable HTTP -> http://localhost:8080/mcp, add the Authorization header
 ```
 
 ### Deploy on Render
 
-`render.yaml` already defines a **`commerceos-buyer-mcp`** web service (Docker,
+`render.yaml` defines a **`commerceos-buyer-mcp`** web service (Docker,
 `integrations/buyer-mcp/Dockerfile`). Sync the blueprint, then on that service set:
 
 | Env | Value |
 |-----|-------|
 | `MCP_TRANSPORT` | `http` (preset) |
 | `AGENT_COMMERCE_BASE_URL` | `https://commerceos.onrender.com/api/v1/agent-commerce` (preset) |
-| `AGENT_COMMERCE_KEY` | an `ack_live_…` key (secret — paste in the UI) |
-| `MCP_URL_SECRET` | *optional* random string → endpoint served at `/<string>` instead of `/mcp` |
+| `AGENT_COMMERCE_KEY` | an `ack_live_…` key (secret) |
+| `MCP_AUTH_TOKEN` | `openssl rand -hex 32` (secret) — the bearer clients must send |
+| `MCP_URL_SECRET` | *optional* obscure path |
 
-Verify: `curl https://commerceos-buyer-mcp.onrender.com/healthz` → `ok`. Connector
-URL = that host + `/mcp` (or `/<MCP_URL_SECRET>`).
+Verify: `curl https://commerceos-buyer-mcp.onrender.com/healthz` → `ok`, and
+`curl -X POST .../mcp` (no auth) → `401`.
 
-### Add to claude.ai (paid plan)
+### Connect
 
-**Settings → Connectors → Add custom connector.** Name it, URL =
-`https://commerceos-buyer-mcp.onrender.com/mcp`, leave OAuth fields blank → Add.
-In a chat, open the tools menu → enable it → *"Buy me a wireless mouse from
-NovaTech, budget ₹2,000."*
+- **Claude Code / Desktop / API** — use the URL + the `Authorization: Bearer
+  <MCP_AUTH_TOKEN>` header (table above). Real auth.
+- **claude.ai web** (paid plan) — Settings → Connectors → Add custom connector,
+  URL = `https://commerceos-buyer-mcp.onrender.com/<MCP_URL_SECRET>` (leave
+  `MCP_AUTH_TOKEN` **unset** for this, since the web UI can't send the header),
+  OAuth fields blank → Add. Enable it in a chat.
 
-### Security note
+### Why the `ack_live_` key stays server-side
 
-claude.ai's connector UI has **no field for an API key**, so the `ack_live_` key
-lives server-side (Render env) and the endpoint itself is unauthenticated —
-anyone who learns the URL can drive your buyer key. Acceptable for a demo (it's a
-Razorpay **test** key, and the backend still enforces per-key scopes, the
-merchant transaction limit, and the human-approval gate). To harden: set
-`MCP_URL_SECRET` to a random path, rotate the key, watch the audit trail, or put
-an OAuth proxy in front.
+The buyer key never leaves Render's env. Even if someone reaches the MCP endpoint,
+the backend still enforces per-key scopes, the merchant transaction limit, and the
+human-approval gate — and it's a Razorpay **test** key. `MCP_AUTH_TOKEN` +
+`MCP_URL_SECRET` are the front-door locks; rotate the `ack_live_` key and watch the
+audit trail if you suspect leakage.

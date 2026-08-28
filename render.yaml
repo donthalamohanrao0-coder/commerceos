@@ -99,6 +99,8 @@ services:
         value: https://commerceos.onrender.com/api/v1/agent-commerce
       - key: AGENT_COMMERCE_KEY
         sync: false # paste an ack_live_ key from Merchant console -> AI buyers
+      - key: MCP_AUTH_TOKEN
+        sync: false # require Authorization: Bearer <this> on /mcp (Claude Code/Desktop/API)
       - key: MCP_URL_SECRET
         sync: false # optional: a random string -> endpoint served at /<string> not /mcp
 
