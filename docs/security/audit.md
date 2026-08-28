@@ -8,9 +8,9 @@ handled gracefully" — plus tenant isolation, auth, and prompt-injection._
 
 The money-movement path was already sound (server-authoritative pricing, a real
 policy re-check at execution time, an idempotent capture path, an append-only
-audit trail). This pass **closed four gaps** in bounded execution and
-deploy-time posture and **added 15 tests** that pin the invariants an agent
-cannot talk its way past.
+audit trail). This pass **closed four gaps** in bounded execution, deploy-time
+posture, and RAG data-handling, and **added 10 tests** that pin the invariants an
+agent cannot talk its way past.
 
 ---
 
