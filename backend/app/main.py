@@ -20,21 +20,29 @@ def _assert_production_ready(settings: Settings) -> None:
     Non-production keeps the credential-gated fakes for local dev / tests."""
     if not settings.is_production:
         return
-    missing: list[str] = []
+
+    # Hard fail: these make a production instance actively unsafe or non-functional.
+    fatal: list[str] = []
     if not (settings.supabase_url and settings.supabase_anon_key):
-        missing.append("SUPABASE_URL + SUPABASE_ANON_KEY (auth would accept any token)")
-    if not (settings.razorpay_key_id and settings.razorpay_key_secret):
-        missing.append("RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET (payments would be faked)")
-    if not settings.openai_api_key:
-        missing.append("OPENAI_API_KEY (the agent would run on canned replies)")
+        fatal.append("SUPABASE_URL + SUPABASE_ANON_KEY (auth would accept ANY bearer token)")
     if "@localhost" in settings.database_url or "commerceos:commerceos" in settings.database_url:
-        missing.append("DATABASE_URL (still points at the local dev database)")
-    if missing:
+        fatal.append("DATABASE_URL (still points at the local dev database)")
+    if fatal:
         raise RuntimeError(
-            "ENVIRONMENT=production but these are unset/insecure: " + "; ".join(missing)
+            "ENVIRONMENT=production but these are unset/insecure: " + "; ".join(fatal)
         )
-    if not settings.pinecone_api_key:
-        _log.warning("PINECONE_API_KEY unset — knowledge retrieval is disabled in production.")
+
+    # Loud warning: the app boots but a capability is running on its Fake.
+    for cond, msg in (
+        (
+            not (settings.razorpay_key_id and settings.razorpay_key_secret),
+            "RAZORPAY keys unset — payments run on FakeRazorpayClient.",
+        ),
+        (not settings.openai_api_key, "OPENAI_API_KEY unset — the agent runs on canned replies."),
+        (not settings.pinecone_api_key, "PINECONE_API_KEY unset — knowledge retrieval disabled."),
+    ):
+        if cond:
+            _log.warning("production: %s", msg)
 
 
 def create_app() -> FastAPI:

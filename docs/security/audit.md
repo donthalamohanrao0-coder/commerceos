@@ -53,7 +53,7 @@ only tighten the step budget), `test_growth_support_guardrails.py::test_graph_te
 | Guarantee | Before | After |
 |---|---|---|
 | Unauthenticated `X-Merchant-Id` fallback | accepted in **all** environments — anyone could drive `/agent/*`, `/carts/*`, `/orders/*`, `/payments/*` for any merchant UUID with no token | `get_current_merchant_id` accepts `X-Merchant-Id` **only when `not settings.is_production`** (local scripts/tests); production requires a verified Supabase identity |
-| Fake auth verifier in production | if `SUPABASE_URL`/`ANON_KEY` were unset, `FakeTokenVerifier` (accepts **any** token) ran silently | `_assert_production_ready` in `create_app()` raises on boot if `ENVIRONMENT=production` and auth / Razorpay / OpenAI / DB are unset or still local |
+| Fake auth verifier in production | if `SUPABASE_URL`/`ANON_KEY` were unset, `FakeTokenVerifier` (accepts **any** token) ran silently | `_assert_production_ready` in `create_app()` **raises on boot** if `ENVIRONMENT=production` and auth or DB are unsafe; **loudly warns** if Razorpay / OpenAI / Pinecone are still on their Fake |
 | Supabase JWT verification | `SupabaseTokenVerifier` calls `GET {SUPABASE_URL}/auth/v1/user` (no JWT secret needed); `IdentityService.resolve` maps to `User` + `Merchant` server-side, never trusting a client merchant id | ✅ solid |
 | Agent Commerce API keys | `ack_live_<48hex>`, only the SHA-256 hash stored; per-key `rate_limit_per_minute` (Redis, in-process fallback) → 429 with no partial state; explicit `require_scope` per route | ✅ solid (`test_rate_limit.py`, DEMO §4B) |
 | Console routes | use `get_identity_tenant_session` — always require a resolved Supabase identity, never `X-Merchant-Id` | ✅ solid |
