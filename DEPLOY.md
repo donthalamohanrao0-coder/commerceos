@@ -19,6 +19,9 @@ Everything runs in test/sandbox mode (Razorpay test keys). No production PII.
 - The secret values currently in `backend/.env` (DB password, OpenAI, Razorpay
   test keys, Pinecone, Supabase keys, Langfuse). **Never commit them** — you paste
   them into the Render/Vercel dashboards.
+- Git commit author must be a real email tied to your GitHub account, or Vercel
+  refuses the deploy. Use the account's noreply address:
+  `git config user.email "<id>+<username>@users.noreply.github.com"`.
 
 ---
 
