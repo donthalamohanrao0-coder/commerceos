@@ -82,6 +82,26 @@ services:
           name: commerceos-redis
           property: connectionString
 
+  # ---------------------------------------------------------------- Buyer MCP (remote)
+  # HTTP MCP server so claude.ai / ChatGPT can drive the Agent Commerce API as a
+  # remote connector. Endpoint: https://<host>/mcp  (or /<MCP_URL_SECRET>).
+  - type: web
+    name: commerceos-buyer-mcp
+    runtime: docker
+    plan: starter # 'free' also works but sleeps after ~15 min idle
+    dockerfilePath: ./integrations/buyer-mcp/Dockerfile
+    dockerContext: ./integrations/buyer-mcp
+    healthCheckPath: /healthz
+    envVars:
+      - key: MCP_TRANSPORT
+        value: http
+      - key: AGENT_COMMERCE_BASE_URL
+        value: https://commerceos.onrender.com/api/v1/agent-commerce
+      - key: AGENT_COMMERCE_KEY
+        sync: false # paste an ack_live_ key from Merchant console -> AI buyers
+      - key: MCP_URL_SECRET
+        sync: false # optional: a random string -> endpoint served at /<string> not /mcp
+
 # ------------------------------------------------------------------ Redis
 # Broker + result backend for Celery, and the rate-limiter's shared store.
 # Free "Key Value" instances are 25 MB and evict under pressure — fine for a demo.

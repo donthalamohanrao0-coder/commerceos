@@ -90,3 +90,55 @@ cd integrations/buyer-mcp
 cp .env.example .env        # fill in AGENT_COMMERCE_KEY
 uv run python -c "import server; print(server.search_catalog(query='mouse', limit=3))"
 ```
+
+---
+
+## Remote (HTTP) transport — for claude.ai / ChatGPT connectors
+
+The same `server.py` speaks **streamable-http** when `MCP_TRANSPORT=http`. Endpoint
+is `https://<host>/mcp` (or `/<MCP_URL_SECRET>` if that env var is set). `GET
+/healthz` returns `ok`.
+
+### Run it locally over HTTP
+
+```bash
+MCP_TRANSPORT=http PORT=8080 \
+AGENT_COMMERCE_BASE_URL=https://commerceos.onrender.com/api/v1/agent-commerce \
+AGENT_COMMERCE_KEY=ack_live_xxxxxxxxxxxxxxxxxxxx \
+uv run server.py
+
+curl -s http://localhost:8080/healthz            # -> ok
+npx @modelcontextprotocol/inspector             # transport "Streamable HTTP" -> http://localhost:8080/mcp
+```
+
+### Deploy on Render
+
+`render.yaml` already defines a **`commerceos-buyer-mcp`** web service (Docker,
+`integrations/buyer-mcp/Dockerfile`). Sync the blueprint, then on that service set:
+
+| Env | Value |
+|-----|-------|
+| `MCP_TRANSPORT` | `http` (preset) |
+| `AGENT_COMMERCE_BASE_URL` | `https://commerceos.onrender.com/api/v1/agent-commerce` (preset) |
+| `AGENT_COMMERCE_KEY` | an `ack_live_…` key (secret — paste in the UI) |
+| `MCP_URL_SECRET` | *optional* random string → endpoint served at `/<string>` instead of `/mcp` |
+
+Verify: `curl https://commerceos-buyer-mcp.onrender.com/healthz` → `ok`. Connector
+URL = that host + `/mcp` (or `/<MCP_URL_SECRET>`).
+
+### Add to claude.ai (paid plan)
+
+**Settings → Connectors → Add custom connector.** Name it, URL =
+`https://commerceos-buyer-mcp.onrender.com/mcp`, leave OAuth fields blank → Add.
+In a chat, open the tools menu → enable it → *"Buy me a wireless mouse from
+NovaTech, budget ₹2,000."*
+
+### Security note
+
+claude.ai's connector UI has **no field for an API key**, so the `ack_live_` key
+lives server-side (Render env) and the endpoint itself is unauthenticated —
+anyone who learns the URL can drive your buyer key. Acceptable for a demo (it's a
+Razorpay **test** key, and the backend still enforces per-key scopes, the
+merchant transaction limit, and the human-approval gate). To harden: set
+`MCP_URL_SECRET` to a random path, rotate the key, watch the audit trail, or put
+an OAuth proxy in front.

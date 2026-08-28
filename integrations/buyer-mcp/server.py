@@ -181,5 +181,34 @@ def request_payment(order_id: str, confirmed: bool = False) -> Any:
     )
 
 
+@mcp.custom_route("/healthz", ["GET"])
+async def _healthz(_request):  # noqa: ANN001, ANN202
+    from starlette.responses import PlainTextResponse
+
+    return PlainTextResponse("ok")
+
+
+def _run() -> None:
+    transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
+    if transport in ("http", "streamable-http", "streamable_http"):
+        from mcp.server.transport_security import TransportSecuritySettings
+
+        # Hosted behind HTTPS on a fixed domain; the localhost-only DNS-rebinding
+        # guard would otherwise 421 every request from claude.ai.
+        mcp.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=False
+        )
+        mcp.settings.host = "0.0.0.0"  # noqa: S104 — bind for the platform's proxy
+        mcp.settings.port = int(os.environ.get("PORT", "8080"))
+        # Optional: serve the endpoint at a hard-to-guess path instead of /mcp.
+        # The connector has no auth field, so a secret path is the cheapest guard.
+        secret = os.environ.get("MCP_URL_SECRET", "").strip("/")
+        if secret:
+            mcp.settings.streamable_http_path = f"/{secret}"
+        mcp.run(transport="streamable-http")  # endpoint: https://<host>/mcp
+    else:
+        mcp.run()  # stdio: Claude Desktop / Claude Code
+
+
 if __name__ == "__main__":
-    mcp.run()
+    _run()
