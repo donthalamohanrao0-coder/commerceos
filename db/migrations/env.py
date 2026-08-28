@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
+from app.agent_commerce import models as agent_commerce_models  # noqa: E402,F401
 from app.agents import models as agent_models  # noqa: E402,F401
 from app.approvals import models as approval_models  # noqa: E402,F401
 from app.audit import models as audit_models  # noqa: E402,F401
@@ -37,7 +38,9 @@ target_metadata = Base.metadata
 
 settings = get_settings()
 db_url = os.environ.get("DATABASE_URL", settings.database_url)
-config.set_main_option("sqlalchemy.url", db_url)
+# Escape % so ConfigParser's BasicInterpolation doesn't choke on URL-encoded
+# passwords (e.g. %40); alembic un-escapes %% back to % when reading the value.
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

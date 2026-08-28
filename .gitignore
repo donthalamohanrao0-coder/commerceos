@@ -31,3 +31,7 @@ Thumbs.db
 *.log
 
 # uv / pnpm (lockfiles ARE kept for reproducibility — do not ignore uv.lock / pnpm-lock.yaml)
+
+# local MCP config (may contain an ack_live_ key)
+.mcp.json
+integrations/buyer-mcp/.env

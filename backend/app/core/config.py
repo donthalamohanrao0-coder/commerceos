@@ -18,6 +18,10 @@ class Settings(BaseSettings):
 
     cors_allow_origins: list[str] = ["http://localhost:3000"]
 
+    # Frontend / demo wiring. A first-time authenticated user is auto-linked to
+    # this merchant (see IdentityService); production replaces this with onboarding.
+    demo_merchant_code: str = "mrc_novatech_001"
+
     # OpenAI — credential-gated (Phase 6). Absent in local dev; FakeOpenAIClient used until set.
     openai_api_key: str | None = None
     openai_reasoning_model: str = "gpt-5"
@@ -29,9 +33,20 @@ class Settings(BaseSettings):
     razorpay_key_secret: str | None = None
     razorpay_webhook_secret: str | None = None
 
-    # Pinecone — credential-gated (Phase 8).
+    # Pinecone — credential-gated (Phase 8). cloud/region are needed to create the
+    # index if it does not exist yet (serverless spec).
     pinecone_api_key: str | None = None
-    pinecone_index: str | None = None
+    pinecone_index_name: str | None = None
+    pinecone_cloud: str = "aws"
+    pinecone_region: str = "us-east-1"
+
+    # RAG chunking + retrieval knobs (Phase 8). Pinned here, not scattered in code,
+    # so the strategy can be tuned without touching the pipeline (plan.md #7).
+    rag_chunk_target_tokens: int = 512
+    rag_chunk_max_tokens: int = 800
+    rag_chunk_overlap_tokens: int = 64
+    rag_retrieval_top_k: int = 6
+    rag_embedding_dimension: int = 1536  # text-embedding-3-small
 
     # Supabase — credential-gated cutover. Local Postgres used until set.
     supabase_url: str | None = None

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_merchant_id, get_session
+from app.api.deps import get_current_merchant_id, get_tenant_session
 from app.api.envelope import ok
 from app.domains.cart.service import CartService
 
@@ -23,7 +23,7 @@ class AddItemRequest(BaseModel):
 @router.post("")
 async def create_cart(
     body: CreateCartRequest,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_tenant_session),
     merchant_id: uuid.UUID = Depends(get_current_merchant_id),
 ) -> dict:
     async with session.begin():
@@ -37,7 +37,7 @@ async def create_cart(
 async def add_item(
     cart_id: uuid.UUID,
     body: AddItemRequest,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_tenant_session),
     merchant_id: uuid.UUID = Depends(get_current_merchant_id),
 ) -> dict:
     async with session.begin():
@@ -57,7 +57,7 @@ async def add_item(
 @router.get("/{cart_id}")
 async def get_cart_totals(
     cart_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_tenant_session),
     merchant_id: uuid.UUID = Depends(get_current_merchant_id),
 ) -> dict:
     service = CartService(session)

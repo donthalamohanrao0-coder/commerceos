@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit.service import ActorType, AuditService
 from app.core.idempotency import with_idempotency
 from app.domains.orders.models import Order
-from app.domains.payments.exceptions import PaymentNotFound, PaymentPolicyDenied
+from app.domains.payments.exceptions import (
+    PaymentNotFound,
+    PaymentPolicyDenied,
+    PaymentVerificationFailed,
+)
 from app.domains.payments.models import Payment
 from app.domains.payments.state_machine import transition
 from app.integrations.razorpay.base import RazorpayClient
@@ -121,6 +125,49 @@ class PaymentService:
         if payment is None or payment.merchant_id != merchant_id:
             raise PaymentNotFound(str(payment_id))
         return payment
+
+    async def verify_and_capture(
+        self,
+        merchant_id: uuid.UUID,
+        payment_id: uuid.UUID,
+        *,
+        razorpay_payment_id: str,
+        razorpay_order_id: str,
+        razorpay_signature: str,
+    ) -> dict[str, object]:
+        """Called by the frontend after Razorpay Checkout succeeds in the browser.
+        Verifies the returned signature server-side, then captures via the same
+        code path a webhook would take (idempotent)."""
+        payment = await self.get_payment(merchant_id, payment_id)
+
+        if payment.provider_order_id != razorpay_order_id:
+            raise PaymentVerificationFailed("order id mismatch")
+
+        if not self._razorpay.verify_payment_signature(
+            order_id=razorpay_order_id,
+            payment_id=razorpay_payment_id,
+            signature=razorpay_signature,
+        ):
+            await self._audit.record(
+                merchant_id=merchant_id,
+                actor_type="customer",
+                order_id=payment.order_id,
+                action="PAYMENT_FAILED",
+                input={"reason": "signature_invalid"},
+            )
+            raise PaymentVerificationFailed("signature verification failed")
+
+        payment.provider_payment_id = razorpay_payment_id
+        await self._session.flush()
+
+        captured = await self.confirm_captured(provider_order_id=razorpay_order_id)
+        return {
+            "payment_id": str(captured.id),
+            "status": captured.status,
+            "order_id": str(captured.order_id),
+            "provider_payment_id": captured.provider_payment_id,
+            "amount_paise": captured.amount_paise,
+        }
 
     async def confirm_captured(self, *, provider_order_id: str) -> Payment:
         """Called by the webhook handler after signature verification + dedup."""

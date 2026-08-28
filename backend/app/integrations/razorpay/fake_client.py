@@ -31,6 +31,19 @@ class FakeRazorpayClient:
         expected = hmac.new(FAKE_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
         return hmac.compare_digest(expected, signature)
 
+    def verify_payment_signature(self, *, order_id: str, payment_id: str, signature: str) -> bool:
+        expected = hmac.new(
+            FAKE_WEBHOOK_SECRET.encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected, signature)
+
+    @staticmethod
+    def sign_payment(order_id: str, payment_id: str) -> str:
+        """Test helper: the signature Razorpay Checkout would hand back."""
+        return hmac.new(
+            FAKE_WEBHOOK_SECRET.encode(), f"{order_id}|{payment_id}".encode(), hashlib.sha256
+        ).hexdigest()
+
     @staticmethod
     def sign_payload(payload: dict[str, object]) -> tuple[bytes, str]:
         """Test helper: produce a (body, signature) pair a test can POST to the

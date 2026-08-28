@@ -50,6 +50,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # Raw SQL DDL in migrations reads better unwrapped than line-wrapped.
 "../db/migrations/versions/*.py" = ["E501"]
+# Seed data rows read better as single lines.
+"../db/seeds/*.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's DI pattern is `param: T = Depends(...)` — not a mutable-default bug.
@@ -62,8 +64,12 @@ disallow_any_generics = false  # JSONB columns are typed as plain `dict` through
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["razorpay.*", "pythonjsonlogger.*"]
+module = ["razorpay.*", "pythonjsonlogger.*", "celery.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["app.workers.*"]
+disallow_untyped_decorators = false  # celery's @task decorator is untyped
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

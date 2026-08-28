@@ -18,6 +18,13 @@ class Base(DeclarativeBase):
     """Declarative base for all ORM models."""
 
 
+# Import every model module so cross-domain string-target foreign keys resolve
+# against a fully-populated Base.metadata, no matter which entrypoint (API, seed,
+# worker, tests) first touches the ORM. Placed after Base is defined to avoid a
+# circular import. Side-effect import only.
+from app import models_registry  # noqa: E402,F401
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency yielding a request-scoped session."""
     async with async_session_factory() as session:
@@ -38,4 +45,7 @@ async def db_session_with_tenant(merchant_id: str) -> AsyncGenerator[AsyncSessio
             text("SELECT set_config('app.current_merchant_id', :merchant_id, true)"),
             {"merchant_id": merchant_id},
         )
+        # Drop to the non-privileged role so the RLS policies actually bind — the
+        # login role (postgres) has BYPASSRLS. Transaction-local; resets on commit.
+        await session.execute(text("SET LOCAL ROLE app_request"))
         yield session

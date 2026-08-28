@@ -1,0 +1,23 @@
+# Keep the backend image build context small and secret-free.
+# The image only needs: backend/, db/, demo-data/
+**/.venv
+**/node_modules
+**/.next
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.local.example
+apps
+docs
+infra
+scripts
+integrations
+**/coverage
+**/.DS_Store
+*.log

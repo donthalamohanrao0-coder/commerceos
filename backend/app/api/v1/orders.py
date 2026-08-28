@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_merchant_id, get_session
+from app.api.deps import get_current_merchant_id, get_tenant_session
 from app.api.envelope import ok
 from app.domains.orders.service import OrderService
 
@@ -18,7 +18,7 @@ class CreateOrderRequest(BaseModel):
 @router.post("")
 async def create_order(
     body: CreateOrderRequest,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_tenant_session),
     merchant_id: uuid.UUID = Depends(get_current_merchant_id),
 ) -> dict:
     async with session.begin():
@@ -45,7 +45,7 @@ async def create_order(
 @router.get("/{order_id}")
 async def get_order(
     order_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_tenant_session),
     merchant_id: uuid.UUID = Depends(get_current_merchant_id),
 ) -> dict:
     order = await OrderService(session).get_order(merchant_id, order_id)

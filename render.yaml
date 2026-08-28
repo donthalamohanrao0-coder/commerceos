@@ -1,0 +1,92 @@
+# Render blueprint for the CommerceOS backend.
+# Dashboard: New + -> Blueprint -> point at this repo. Fill every `sync: false`
+# var (they are secrets) in the Render UI after the first apply.
+#
+# The Next.js frontend deploys separately on Vercel (see DEPLOY.md).
+
+services:
+  # ---------------------------------------------------------------- API
+  - type: web
+    name: commerceos-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /docs
+    # Runs migrations once before each deploy goes live (paid plans).
+    # On the free plan, delete this and use:
+    #   dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false # Supabase: postgresql+asyncpg://postgres:<pw>@db.<ref>.supabase.co:5432/postgres
+      - key: CORS_ALLOW_ORIGINS
+        sync: false # JSON list, e.g. ["https://commerceos.vercel.app"]
+      - key: DEMO_MERCHANT_CODE
+        value: mrc_novatech_001
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        sync: false
+      - key: LANGFUSE_PUBLIC_KEY
+        sync: false
+      - key: LANGFUSE_SECRET_KEY
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: commerceos-redis
+          property: connectionString
+
+  # ---------------------------------------------------------------- Celery worker
+  # Background jobs: knowledge ingestion + growth-analytics snapshot refresh.
+  # The app runs fine without it (rate-limiting falls back to in-process); enable
+  # when you want async ingestion.
+  - type: worker
+    name: commerceos-worker
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: celery -A app.workers.celery_app.celery_app worker --loglevel=info --concurrency=2
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_NAME
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: commerceos-redis
+          property: connectionString
+
+# ------------------------------------------------------------------ Redis
+# Broker + result backend for Celery, and the rate-limiter's shared store.
+# Free "Key Value" instances are 25 MB and evict under pressure — fine for a demo.
+# Alternative: an external Upstash URL set directly as REDIS_URL (delete this block).
+redis:
+  - name: commerceos-redis
+    plan: free
+    ipAllowList: [] # only reachable from Render services

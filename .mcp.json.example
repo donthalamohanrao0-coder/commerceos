@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "commerceos-buyer": {
+      "command": "uv",
+      "args": ["run", "--directory", "./integrations/buyer-mcp", "server.py"],
+      "env": {
+        "AGENT_COMMERCE_BASE_URL": "http://localhost:8000/api/v1/agent-commerce",
+        "AGENT_COMMERCE_KEY": "ack_live_REPLACE_WITH_A_KEY_FROM_THE_CONSOLE"
+      }
+    }
+  }
+}

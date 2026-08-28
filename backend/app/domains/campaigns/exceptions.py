@@ -1,0 +1,2 @@
+class CampaignNotFound(Exception):
+    pass

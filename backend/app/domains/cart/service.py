@@ -52,6 +52,16 @@ class CartService:
         await self._session.flush()
         return cart
 
+    async def create_fresh_cart(
+        self, merchant_id: uuid.UUID, *, customer_id: uuid.UUID | None = None
+    ) -> Cart:
+        """Always a new cart. Used for stateless flows (external AI buyers) where
+        reusing a lingering anonymous active cart would leak items between requests."""
+        cart = Cart(id=uuid.uuid4(), merchant_id=merchant_id, customer_id=customer_id)
+        self._session.add(cart)
+        await self._session.flush()
+        return cart
+
     async def get_cart(self, merchant_id: uuid.UUID, cart_id: uuid.UUID) -> Cart:
         cart = await self._session.scalar(
             select(Cart).where(Cart.id == cart_id, Cart.merchant_id == merchant_id)

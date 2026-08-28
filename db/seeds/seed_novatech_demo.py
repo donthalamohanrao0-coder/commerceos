@@ -1,6 +1,6 @@
 """Seeds the CommerceOS demo dataset for merchant NovaTech Store (mrc_novatech_001).
 
-Import order follows commerceos-business-demo-data/DATA_DICTIONARY.md:
+Import order follows demo-data/DATA_DICTIONARY.md:
 merchant profile -> categories (informational only, not a DB table) -> products ->
 inventory -> customers -> campaigns -> policies/knowledge -> agent configuration ->
 historical orders/analytics.
@@ -20,6 +20,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 from sqlalchemy import select  # noqa: E402
 
+# Import every model package so the mapper registry is complete: seeded tables
+# (carts, orders) carry FKs into agent_sessions / documents / etc., and SQLAlchemy
+# must resolve all of them before it can flush.
+from app.agents import models as _agent_models  # noqa: E402,F401
+from app.approvals import models as _approval_models  # noqa: E402,F401
+from app.audit import models as _audit_models  # noqa: E402,F401
+from app.core import idempotency_models as _idempotency_models  # noqa: E402,F401
 from app.core.db import async_session_factory  # noqa: E402
 from app.domains.campaigns.models import Campaign, CampaignRule  # noqa: E402
 from app.domains.cart.models import Cart  # noqa: E402
@@ -27,9 +34,11 @@ from app.domains.catalog.models import Inventory, Product, ProductVariant  # noq
 from app.domains.customers.models import Customer  # noqa: E402
 from app.domains.merchants.models import Merchant, Organization  # noqa: E402
 from app.domains.orders.models import Order, OrderItem  # noqa: E402
+from app.knowledge import models as _knowledge_models  # noqa: E402,F401
 from app.policies.models import Policy  # noqa: E402
+from app.webhooks import models as _webhook_models  # noqa: E402,F401
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "commerceos-business-demo-data"
+DATA_ROOT = Path(__file__).resolve().parents[2] / "demo-data"
 MERCHANT_CODE = "mrc_novatech_001"
 
 

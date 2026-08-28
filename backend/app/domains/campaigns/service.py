@@ -4,10 +4,12 @@ no fake urgency/social proof, discount never exceeds merchant policy)."""
 
 import uuid
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domains.campaigns.exceptions import CampaignNotFound
 from app.domains.campaigns.models import Campaign, CampaignRule
 from app.domains.cart.models import CartItem
 from app.domains.catalog.models import Product, ProductVariant
@@ -25,6 +27,64 @@ class CampaignService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._policy_engine = PolicyEngine(session)
+
+    async def create_draft(
+        self,
+        merchant_id: uuid.UUID,
+        *,
+        name: str,
+        discount_type: str,
+        discount_percent: float | None = None,
+        discount_fixed_paise: int | None = None,
+        max_discount_paise: int | None = None,
+        rules: list[tuple[str, dict[str, Any]]] | None = None,
+    ) -> Campaign:
+        """Create a campaign in `draft` that always requires merchant approval.
+        The discount ceiling is capped by the merchant's auto-discount policy so a
+        draft can never be configured beyond what policy would allow at checkout."""
+        policy = await self._policy_engine.check_discount(merchant_id, max_discount_paise or 0)
+        capped_ceiling = (
+            max_discount_paise
+            if policy.allowed or max_discount_paise is None
+            else (policy.capped_value or 0)
+        )
+        campaign = Campaign(
+            id=uuid.uuid4(),
+            merchant_id=merchant_id,
+            external_campaign_code=f"cmp_{uuid.uuid4().hex[:10]}",
+            name=name,
+            status="draft",
+            discount_type=discount_type,
+            discount_percent=discount_percent,
+            discount_fixed_paise=discount_fixed_paise,
+            max_discount_paise=capped_ceiling,
+            requires_merchant_approval=True,
+        )
+        self._session.add(campaign)
+        await self._session.flush()
+        for rule_type, rule_value in rules or []:
+            self._session.add(
+                CampaignRule(
+                    id=uuid.uuid4(),
+                    campaign_id=campaign.id,
+                    rule_type=rule_type,
+                    rule_value=rule_value,
+                )
+            )
+        await self._session.flush()
+        return campaign
+
+    async def get_campaign(self, merchant_id: uuid.UUID, campaign_id: uuid.UUID) -> Campaign:
+        campaign = await self._session.get(Campaign, campaign_id)
+        if campaign is None or campaign.merchant_id != merchant_id:
+            raise CampaignNotFound(str(campaign_id))
+        return campaign
+
+    async def activate(self, merchant_id: uuid.UUID, campaign_id: uuid.UUID) -> Campaign:
+        campaign = await self.get_campaign(merchant_id, campaign_id)
+        campaign.status = "active"
+        await self._session.flush()
+        return campaign
 
     async def _active_campaigns(self, merchant_id: uuid.UUID) -> list[Campaign]:
         result = await self._session.scalars(
@@ -76,6 +136,46 @@ class CampaignService:
                 if category_totals.get(category, 0) < rule.rule_value["min_paise"]:
                     return False
         return True
+
+    async def near_miss_category_unlocks(
+        self,
+        merchant_id: uuid.UUID,
+        *,
+        cart_items: list[CartItem],
+        customer_segment: str | None,
+    ) -> list[tuple[Campaign, set[str]]]:
+        """Active campaigns that would become eligible for this cart if one more
+        product from a specific category were added — every rule already passes
+        except a single ``eligible_category`` rule. Returns (campaign, the
+        categories that would satisfy that rule). Used to nudge cross-sell.
+        """
+        if not cart_items:
+            return []
+        cart_categories, category_totals = await self._cart_categories_and_total(cart_items)
+        out: list[tuple[Campaign, set[str]]] = []
+        for campaign in await self._active_campaigns(merchant_id):
+            missing: set[str] | None = None
+            blocked = False
+            for rule in await self._rules_for(campaign.id):
+                if rule.rule_type == "eligible_segment":
+                    if customer_segment not in rule.rule_value.get("segments", []):
+                        blocked = True
+                        break
+                elif rule.rule_type == "min_category_purchase":
+                    category = rule.rule_value["category"]
+                    if category_totals.get(category, 0) < rule.rule_value["min_paise"]:
+                        blocked = True
+                        break
+                elif rule.rule_type == "eligible_category":
+                    cats = set(rule.rule_value.get("categories", []))
+                    if not cart_categories.intersection(cats):
+                        if missing is not None:
+                            blocked = True
+                            break
+                        missing = cats
+            if not blocked and missing:
+                out.append((campaign, missing))
+        return out
 
     async def evaluate_campaigns_for_cart(
         self,
