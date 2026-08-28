@@ -53,6 +53,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 "../db/migrations/versions/*.py" = ["E501"]
 # Seed data rows read better as single lines.
 "../db/seeds/*.py" = ["E501"]
+# Eval Q&A rows read better as single lines.
+"tests/rag_eval/dataset.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI's DI pattern is `param: T = Depends(...)` — not a mutable-default bug.

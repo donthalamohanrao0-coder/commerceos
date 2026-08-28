@@ -46,5 +46,37 @@
     "version": 1,
     "merchant_id": "mrc_novatech_001",
     "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "bulk_and_business_orders",
+    "path": "knowledge/bulk_and_business_orders.md",
+    "document_type": "merchant_policy",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "novacare_extended_warranty",
+    "path": "knowledge/novacare_extended_warranty.md",
+    "document_type": "merchant_policy",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "trade_in_program",
+    "path": "knowledge/trade_in_program.md",
+    "document_type": "faq_or_guide",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
+  },
+  {
+    "document_id": "education_and_gst_invoicing",
+    "path": "knowledge/education_and_gst_invoicing.md",
+    "document_type": "faq_or_guide",
+    "version": 1,
+    "merchant_id": "mrc_novatech_001",
+    "pinecone_namespace": "merchant_mrc_novatech_001"
   }
 ]

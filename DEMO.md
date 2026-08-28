@@ -70,11 +70,15 @@ buyer), status mix, top products.
 this week / …**, filter by workflow. Click one → the full trace drawer: every
 tool call, its duration, input/output summary, and the **policy decision**.
 
-**Console → Knowledge base** → the grounding corpus (6 indexed docs, chunk counts,
-index version). The **Retrieval preview** box runs the exact semantic search the
-shopping agent runs — type *"what is the return window"* → ranked passages with
-similarity scores. This is what "grounded, not hallucinated" means: the agent can
-only cite what shows up here.
+**Console → Knowledge base** → the grounding corpus (10 indexed docs — shipping,
+returns, warranty, NovaCare, bulk orders, trade-in, education/GST, …). The
+**Retrieval preview** box runs the exact semantic search the shopping agent runs
+— type *"what's the discount for buying 30 laptops"* → ranked passages with
+similarity scores. **Add a document** uploads a markdown/text file straight into
+the vector namespace (chunk → embed → Pinecone) and the agent can cite it
+immediately. Retrieval accuracy is measured — hit@3 100%, MRR 0.94 over 38 Q&A
+(`docs/ai/rag-eval.md`). This is what "grounded, not hallucinated" means: the
+agent can only cite what shows up here.
 
 ---
 
