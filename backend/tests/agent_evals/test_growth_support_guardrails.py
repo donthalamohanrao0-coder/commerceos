@@ -95,7 +95,7 @@ async def test_over_limit_payment_fails_closed_and_explains(db: AsyncSession, me
 
 
 async def test_graph_terminates_within_step_budget(db: AsyncSession, merchant) -> None:
-    from app.agents.base_service import _MAX_STEPS
+    from app.agents.base_service import _MAX_STEPS_CEILING
     from app.agents.service import ShoppingAgentService
 
     svc = ShoppingAgentService(db)
@@ -105,4 +105,4 @@ async def test_graph_terminates_within_step_budget(db: AsyncSession, merchant) -
     )
     # a final assistant message is always produced; the loop cannot run away
     assert isinstance(r.assistant_text, str) and r.assistant_text
-    assert len(r.tool_trace) <= _MAX_STEPS
+    assert len(r.tool_trace) <= _MAX_STEPS_CEILING

@@ -26,6 +26,10 @@ _FALLBACK = (
     "I've done what I can for this turn. Could you tell me a bit more about what "
     "you'd like to do next?"
 )
+_BUDGET_HIT = (
+    "This turn ran longer than I'm allowed to. I've stopped here without taking "
+    "any further action — please try again or narrow the request."
+)
 
 
 async def _record_action(
@@ -68,11 +72,24 @@ def build_agent_graph(
 
     async def agent_node(state: AgentGraphState) -> dict[str, Any]:
         step = state.get("step", 0) + 1
-        if step > state.get("max_steps", 8):
+
+        # Bounded execution (agent-guardrails.md #3): stop on any of the merchant's
+        # configured budgets — graph steps, cumulative tool calls, wall-clock.
+        deadline = state.get("deadline", 0.0)
+        over_budget = (
+            step > state.get("max_steps", 8)
+            or state.get("tool_calls_made", 0) >= state.get("max_tool_calls", 10)
+            or (deadline and time.monotonic() > deadline)
+        )
+        if over_budget:
+            stopped_early = step <= state.get("max_steps", 8) and not (
+                state.get("tool_calls_made", 0) >= state.get("max_tool_calls", 10)
+            )
+            text = _BUDGET_HIT if stopped_early else _FALLBACK
             return {
                 "step": step,
-                "final_text": _FALLBACK,
-                "messages": [ChatMessage(role="assistant", content=_FALLBACK)],
+                "final_text": text,
+                "messages": [ChatMessage(role="assistant", content=text)],
             }
 
         messages = [ChatMessage(role="system", content=system_prompt), *state["messages"]]
@@ -145,7 +162,11 @@ def build_agent_graph(
             )
             trace_rows.append({"tool": tc.name, "status": status, "output": output})
 
-        update: dict[str, Any] = {"messages": tool_msgs, "tool_trace": trace_rows}
+        update: dict[str, Any] = {
+            "messages": tool_msgs,
+            "tool_trace": trace_rows,
+            "tool_calls_made": len(last.tool_calls),
+        }
         if ctx.pending_approval is not None:
             update["pending_approval"] = ctx.pending_approval
         return update

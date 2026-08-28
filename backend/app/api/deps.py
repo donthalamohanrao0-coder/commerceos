@@ -16,6 +16,7 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_commerce.keys import AgentApiKeyService, AgentPrincipal, InvalidAgentKey
+from app.core.config import get_settings
 from app.core.db import async_session_factory
 from app.core.rate_limit import enforce_rate_limit
 from app.identity.service import IdentityService, MerchantIdentity, NoMerchantForUser
@@ -100,7 +101,9 @@ async def get_current_merchant_id(
     """
     if _bearer(authorization):
         return (await get_merchant_identity(authorization)).merchant_id
-    if x_merchant_id:
+    # The unauthenticated X-Merchant-Id fallback is for local scripts / tests only.
+    # In production every tenant request must carry a verified Supabase identity.
+    if x_merchant_id and not get_settings().is_production:
         try:
             return uuid.UUID(x_merchant_id)
         except ValueError as exc:

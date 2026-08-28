@@ -18,6 +18,10 @@ class AgentGraphState(TypedDict, total=False):
     messages: Annotated[list[ChatMessage], operator.add]
     step: int
     max_steps: int
+    # bounded-execution budgets (PolicyEngine.get_agent_limits, agent-guardrails.md #3)
+    max_tool_calls: int
+    tool_calls_made: Annotated[int, operator.add]
+    deadline: float  # time.monotonic() past which the turn must stop
     final_text: str | None
     pending_approval: dict[str, Any] | None
     tool_trace: Annotated[list[dict[str, Any]], operator.add]

@@ -8,6 +8,7 @@ all live here.
 
 from __future__ import annotations
 
+import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
@@ -29,9 +30,12 @@ from app.domains.customers.models import Customer
 from app.domains.merchants.models import Merchant
 from app.integrations.langfuse.client import get_tracer
 from app.integrations.openai.chat import ChatMessage, ToolCall, get_chat_client
+from app.policies.engine import PolicyEngine
 
 _HISTORY_LIMIT = 40
-_MAX_STEPS = 8
+# Hard ceiling on graph steps regardless of merchant policy — defence in depth so
+# a mis-set `max_graph_steps` can't make a turn pathologically slow/expensive.
+_MAX_STEPS_CEILING = 12
 
 
 class AgentSessionNotFound(Exception):
@@ -243,6 +247,23 @@ class BaseAgentService(ABC):
             tool_trace=tool_trace,
         )
 
+    async def _initial_state(
+        self, merchant_id: uuid.UUID, history: list[ChatMessage], user_msg: ChatMessage
+    ) -> dict[str, Any]:
+        """Turn state seeded with this merchant's bounded-execution budgets
+        (agent-guardrails.md #3) — never unbounded, and a merchant can only make
+        them *tighter* than the built-in ceiling."""
+        limits = await PolicyEngine(self._session).get_agent_limits(merchant_id)
+        return {
+            "messages": [*history, user_msg],
+            "step": 0,
+            "max_steps": min(limits["max_graph_steps"], _MAX_STEPS_CEILING),
+            "max_tool_calls": limits["max_tool_calls"],
+            "tool_calls_made": 0,
+            "deadline": time.monotonic() + limits["max_execution_seconds"],
+            "tool_trace": [],
+        }
+
     async def send_message(
         self, *, merchant_id: uuid.UUID, session_id: uuid.UUID, text: str
     ) -> AgentTurnResult:
@@ -253,7 +274,7 @@ class BaseAgentService(ABC):
 
         graph = self._build_graph(ctx, merchant_id, session_id)
         final_state = await graph.ainvoke(
-            {"messages": [*history, user_msg], "step": 0, "max_steps": _MAX_STEPS, "tool_trace": []}
+            await self._initial_state(merchant_id, history, user_msg)
         )
         return await self._finalize(
             agent_session, session_id, len(history), user_msg, ctx, final_state
@@ -278,12 +299,7 @@ class BaseAgentService(ABC):
         seen_tool_call_ids: set[str] = set()
         try:
             async for state in graph.astream(
-                {
-                    "messages": [*history, user_msg],
-                    "step": 0,
-                    "max_steps": _MAX_STEPS,
-                    "tool_trace": [],
-                },
+                await self._initial_state(merchant_id, history, user_msg),
                 stream_mode="values",
             ):
                 final_state = state

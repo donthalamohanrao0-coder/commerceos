@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     otel_exporter_otlp_endpoint: str | None = None
 
     @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in ("production", "prod")
+
+    @property
     def celery_broker(self) -> str:
         return self.celery_broker_url or self.redis_url
 
