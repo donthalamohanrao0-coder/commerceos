@@ -237,6 +237,7 @@ export interface ConsolePayment {
   provider_payment_id: string | null;
   signature_verified: boolean;
   failure_reason: string | null;
+  payment_link_url: string | null;
   created_at: string;
 }
 

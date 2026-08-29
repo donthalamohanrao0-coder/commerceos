@@ -95,6 +95,18 @@ export function usePayments() {
   });
 }
 
+export function useReconcilePayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) =>
+      api<{ payment_id: string; status: string; action: string; provider_status?: string }>(
+        `/console/payments/${paymentId}/reconcile`,
+        { method: "POST" },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["console", "payments"] }),
+  });
+}
+
 export function useCampaigns() {
   return useQuery({
     queryKey: ["console", "campaigns"],
