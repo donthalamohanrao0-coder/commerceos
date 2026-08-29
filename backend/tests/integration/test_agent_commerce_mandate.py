@@ -132,3 +132,40 @@ async def test_payment_link_paid_settles_order(
             AuditEvent.order_id == oid, AuditEvent.action == "PAYMENT_SUCCEEDED"
         )
     )
+
+
+async def test_reconcile_settles_when_provider_says_paid(
+    db: AsyncSession, merchant, cheap_product
+) -> None:
+    """The safety net for a missed / mis-signed settlement webhook: ask Razorpay
+    directly and settle if it says the payment link cleared."""
+    from app.domains.payments.models import Payment
+    from app.domains.payments.state_machine import transition
+    from app.integrations.razorpay.fake_client import FakeRazorpayClient
+
+    oid = await _order_id(db, merchant, cheap_product)
+    order = await db.get(Order, oid)
+    payment = Payment(
+        id=uuid.uuid4(),
+        merchant_id=merchant.id,
+        order_id=oid,
+        amount_paise=order.total_paise,
+        status="created",
+        provider_order_id="order_recon_x",
+        payment_link_id="plink_recon_x",
+        payment_link_url="https://rzp.test/i/plink_recon_x",
+    )
+    transition(payment, "pending")
+    db.add(payment)
+    await db.flush()
+
+    fake = FakeRazorpayClient()
+    svc = PaymentService(db, fake)
+
+    assert (await svc.reconcile(merchant.id, payment.id))["action"] == "no_change"
+
+    fake.mark_link_paid("plink_recon_x")  # the buyer pays the hosted link
+    assert (await svc.reconcile(merchant.id, payment.id))["action"] == "settled"
+
+    await db.refresh(order)
+    assert order.status == "paid"

@@ -295,6 +295,9 @@ class AgentCommerceService:
                 },
             )
             link_url, link_id = link.short_url, link.link_id
+            await PaymentService(self._session).attach_payment_link(
+                payment_id, link_id=link.link_id, link_url=link.short_url
+            )
         except Exception:  # noqa: BLE001 - link is a convenience; the intent already exists
             link_url = None
 

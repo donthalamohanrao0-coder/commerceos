@@ -57,6 +57,11 @@ class Payment(Base, UUIDPKMixin, TimestampMixin, UpdatedAtMixin):
     provider: Mapped[str] = mapped_column(String, nullable=False, default="razorpay")
     provider_order_id: Mapped[str | None] = mapped_column(String)
     provider_payment_id: Mapped[str | None] = mapped_column(String)
+    # Razorpay Payment Link — the settlement path for a headless AI buyer. The link
+    # runs its own internal order, so we keep its id to reconcile with the provider
+    # if the webhook is missed.
+    payment_link_id: Mapped[str | None] = mapped_column(String)
+    payment_link_url: Mapped[str | None] = mapped_column(String)
     razorpay_signature_verified: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )

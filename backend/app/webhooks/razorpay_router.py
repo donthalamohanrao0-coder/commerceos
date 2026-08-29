@@ -1,6 +1,7 @@
 """Razorpay webhook: receive -> verify signature -> deduplicate -> validate state
 transition -> update DB -> audit (payment-security.md #5, exact sequence)."""
 
+import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -10,11 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session
 from app.api.envelope import ok
+from app.domains.payments.exceptions import PaymentNotFound
 from app.domains.payments.service import PaymentService
 from app.integrations.razorpay.base import RazorpayClient
 from app.integrations.razorpay.factory import get_razorpay_client
 from app.webhooks.models import WebhookEvent
 
+_log = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
@@ -34,6 +37,15 @@ async def razorpay_webhook(
     payload = await request.json()
     provider_event_id = payload.get("id") or payload.get("event_id", "")
     event_type = payload.get("event", "unknown")
+
+    if not signature_valid:
+        _log.warning(
+            "razorpay webhook signature INVALID (event=%s, id=%s, sig_prefix=%s). "
+            "Check RAZORPAY_WEBHOOK_SECRET matches the dashboard webhook secret.",
+            event_type,
+            provider_event_id,
+            (x_razorpay_signature or "")[:8],
+        )
 
     async with session.begin():
         existing = await session.scalar(
@@ -81,21 +93,41 @@ async def razorpay_webhook(
         provider_order_id = payment_entity.get("order_id") or order_entity.get("id")
 
         paid_events = {"payment.captured", "order.paid", "payment_link.paid"}
-        if event_type in paid_events:
-            if co_payment_id:
-                await payment_service.confirm_captured_by_payment_id(
-                    payment_id=UUID(str(co_payment_id))
+        outcome = "ignored"
+        try:
+            if event_type in paid_events:
+                if co_payment_id:
+                    await payment_service.confirm_captured_by_payment_id(
+                        payment_id=UUID(str(co_payment_id))
+                    )
+                    outcome = "settled_by_payment_id"
+                elif provider_order_id:
+                    await payment_service.confirm_captured(provider_order_id=provider_order_id)
+                    outcome = "settled_by_order_id"
+                else:
+                    outcome = "no_match_key"
+            elif event_type == "payment.failed" and provider_order_id:
+                reason = payment_entity.get("error_description", "payment_failed")
+                await payment_service.confirm_failed(
+                    provider_order_id=provider_order_id, reason=reason
                 )
-            elif provider_order_id:
-                await payment_service.confirm_captured(provider_order_id=provider_order_id)
-        elif event_type == "payment.failed" and provider_order_id:
-            reason = payment_entity.get("error_description", "payment_failed")
-            await payment_service.confirm_failed(
-                provider_order_id=provider_order_id, reason=reason
-            )
+                outcome = "marked_failed"
+        except PaymentNotFound:
+            # e.g. a payment.captured for a payment link's internal order that we
+            # never track — the matching payment_link.paid event settles it instead.
+            outcome = "payment_not_found"
 
         event.processing_status = "processed"
         event.processed_at = datetime.now(UTC)
         await session.flush()
 
-    return ok({"status": "processed"})
+    _log.info(
+        "razorpay webhook: event=%s id=%s sig_ok=%s co_payment_id=%s order_id=%s -> %s",
+        event_type,
+        provider_event_id,
+        signature_valid,
+        co_payment_id,
+        provider_order_id,
+        outcome,
+    )
+    return ok({"status": "processed", "outcome": outcome})

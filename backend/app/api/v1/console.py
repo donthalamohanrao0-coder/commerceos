@@ -31,7 +31,9 @@ from app.domains.catalog.models import Inventory, Product, ProductVariant
 from app.domains.customers.models import Customer
 from app.domains.merchants.models import Merchant
 from app.domains.orders.models import Order, OrderItem
+from app.domains.payments.exceptions import PaymentNotFound
 from app.domains.payments.models import Payment
+from app.domains.payments.service import PaymentService
 from app.identity.service import MerchantIdentity
 from app.knowledge.ingestion.pipeline import KnowledgeIngestionService
 from app.knowledge.models import Document, DocumentVersion
@@ -444,11 +446,31 @@ async def payments(
                     "signature_verified": p.razorpay_signature_verified,
                     "failure_reason": p.failure_reason,
                     "created_at": p.created_at.isoformat(),
+                    "payment_link_url": p.payment_link_url,
                 }
                 for p in rows
             ]
         }
     )
+
+
+@router.post("/payments/{payment_id}/reconcile")
+async def reconcile_payment(
+    payment_id: uuid.UUID,
+    identity: MerchantIdentity = _IDENTITY,
+    session: AsyncSession = _SESSION,
+) -> dict:
+    """Ask Razorpay whether this payment cleared and settle it if so — the manual
+    safety net when a settlement webhook was missed or mis-signed."""
+    try:
+        async with session.begin():
+            result = await PaymentService(session).reconcile(identity.merchant_id, payment_id)
+    except PaymentNotFound as exc:
+        raise HTTPException(status_code=404, detail="payment not found") from exc
+    except Exception as exc:  # noqa: BLE001
+        _log.exception("reconcile failed for payment %s", payment_id)
+        raise HTTPException(status_code=503, detail=f"provider reconcile failed: {exc}") from exc
+    return ok(result)
 
 
 # --------------------------------------------------------------- campaigns / settings

@@ -194,6 +194,50 @@ class PaymentService:
             raise PaymentNotFound(str(payment_id))
         return await self._settle(payment)
 
+    async def attach_payment_link(
+        self, payment_id: uuid.UUID, *, link_id: str, link_url: str
+    ) -> None:
+        payment = await self._session.get(Payment, payment_id)
+        if payment is not None:
+            payment.payment_link_id = link_id
+            payment.payment_link_url = link_url
+            await self._session.flush()
+
+    async def reconcile(self, merchant_id: uuid.UUID, payment_id: uuid.UUID) -> dict[str, object]:
+        """Ask Razorpay directly whether this payment cleared, and settle it if so.
+        The safety net for a missed / mis-signed settlement webhook."""
+        payment = await self.get_payment(merchant_id, payment_id)
+        if payment.status == "paid":
+            return {"payment_id": str(payment.id), "status": "paid", "action": "already_paid"}
+        if payment.status in ("failed", "refunded", "refund_processing", "refund_requested"):
+            return {
+                "payment_id": str(payment.id),
+                "status": payment.status,
+                "action": "not_reconcilable",
+            }
+
+        state = self._razorpay.reconcile(
+            provider_order_id=payment.provider_order_id,
+            payment_link_id=payment.payment_link_id,
+        )
+        if not state.paid:
+            return {
+                "payment_id": str(payment.id),
+                "status": payment.status,
+                "provider_status": state.status,
+                "action": "no_change",
+            }
+
+        if state.provider_payment_id:
+            payment.provider_payment_id = state.provider_payment_id
+        settled = await self._settle(payment)
+        return {
+            "payment_id": str(settled.id),
+            "status": settled.status,
+            "provider_status": state.status,
+            "action": "settled",
+        }
+
     async def _settle(self, payment: Payment) -> Payment:
         if payment.status == "paid":
             return payment  # duplicate webhook delivery — no-op (payment-security.md #6)

@@ -6,7 +6,11 @@ import hmac
 import json
 import uuid
 
-from app.integrations.razorpay.base import RazorpayOrder, RazorpayPaymentLink
+from app.integrations.razorpay.base import (
+    RazorpayOrder,
+    RazorpayPaymentLink,
+    RazorpayProviderState,
+)
 
 FAKE_WEBHOOK_SECRET = "fake-local-webhook-secret"
 
@@ -15,6 +19,8 @@ class FakeRazorpayClient:
     def __init__(self) -> None:
         self.created_orders: dict[str, RazorpayOrder] = {}
         self.created_links: dict[str, RazorpayPaymentLink] = {}
+        self.paid_links: set[str] = set()
+        self.paid_orders: set[str] = set()
 
     def create_order(
         self, *, amount_paise: int, receipt: str, notes: dict[str, str]
@@ -40,6 +46,21 @@ class FakeRazorpayClient:
         )
         self.created_links[link_id] = link
         return link
+
+    def mark_link_paid(self, link_id: str) -> None:
+        """Test helper: simulate the buyer completing the hosted payment link."""
+        self.paid_links.add(link_id)
+
+    def reconcile(
+        self, *, provider_order_id: str | None, payment_link_id: str | None
+    ) -> RazorpayProviderState:
+        if payment_link_id and payment_link_id in self.paid_links:
+            return RazorpayProviderState(
+                paid=True, status="paid", provider_payment_id=f"pay_fake_{payment_link_id[-10:]}"
+            )
+        if provider_order_id and provider_order_id in self.paid_orders:
+            return RazorpayProviderState(paid=True, status="captured")
+        return RazorpayProviderState(paid=False, status="no_captured_payment")
 
     def verify_webhook_signature(self, *, body: bytes, signature: str) -> bool:
         expected = hmac.new(FAKE_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()

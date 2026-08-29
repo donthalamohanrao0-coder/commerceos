@@ -5,7 +5,13 @@ secrets-and-data-protection.md #2)."""
 import razorpay
 from razorpay.utility.utility import Utility
 
-from app.integrations.razorpay.base import RazorpayOrder, RazorpayPaymentLink
+from app.integrations.razorpay.base import (
+    RazorpayOrder,
+    RazorpayPaymentLink,
+    RazorpayProviderState,
+)
+
+_PAID_STATES = {"captured", "authorized", "paid"}
 
 
 class RealRazorpayClient:
@@ -52,6 +58,31 @@ class RealRazorpayClient:
             status=result.get("status", "created"),
             amount_paise=result["amount"],
         )
+
+    def reconcile(
+        self, *, provider_order_id: str | None, payment_link_id: str | None
+    ) -> RazorpayProviderState:
+        if payment_link_id:
+            link = self._client.payment_link.fetch(payment_link_id)
+            pid = None
+            for p in link.get("payments") or []:
+                if p.get("status") in _PAID_STATES:
+                    pid = p.get("payment_id") or p.get("id")
+                    break
+            return RazorpayProviderState(
+                paid=link.get("status") == "paid" or pid is not None,
+                status=str(link.get("status", "unknown")),
+                provider_payment_id=pid,
+            )
+        if provider_order_id:
+            payments = self._client.order.payments(provider_order_id)
+            for p in payments.get("items", []):
+                if p.get("status") in _PAID_STATES:
+                    return RazorpayProviderState(
+                        paid=True, status=str(p["status"]), provider_payment_id=p.get("id")
+                    )
+            return RazorpayProviderState(paid=False, status="no_captured_payment")
+        return RazorpayProviderState(paid=False, status="nothing_to_reconcile")
 
     def verify_webhook_signature(self, *, body: bytes, signature: str) -> bool:
         try:

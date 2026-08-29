@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -45,6 +45,8 @@ class Order(Base, UUIDPKMixin, TimestampMixin, UpdatedAtMixin):
     agent_session_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("agent_sessions.id")
     )
+    # {name, phone, email, line1, line2, city, state, postal_code, country}
+    shipping_address: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
         UniqueConstraint("merchant_id", "order_number", name="uq_orders_merchant_number"),
