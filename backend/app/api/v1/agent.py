@@ -24,6 +24,7 @@ from app.agents.supervisor import classify_workflow
 from app.agents.support_service import SupportAgentService
 from app.api.deps import get_current_merchant_id, get_tenant_session
 from app.api.envelope import ok
+from app.core.rate_limit import enforce_rate_limit
 from app.domains.cart.models import CartItem
 from app.domains.catalog.models import Product, ProductVariant
 from app.integrations.openai.chat import get_chat_client
@@ -32,6 +33,16 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 _SESSION = Depends(get_tenant_session)
 _MERCHANT = Depends(get_current_merchant_id)
+
+# Each chat turn fans out to ~5-6 LLM calls, so throttle per conversation to cap
+# token spend / abuse. Redis-backed with an in-process fallback (see rate_limit).
+_TURNS_PER_MINUTE = 20
+
+
+async def _throttle_turn(session_id: uuid.UUID) -> None:
+    await enforce_rate_limit(
+        f"agentchat:{session_id}", limit=_TURNS_PER_MINUTE, window_seconds=60
+    )
 
 _SERVICES: dict[str, type[BaseAgentService]] = {
     "shopping": ShoppingAgentService,
@@ -89,6 +100,7 @@ async def send_message(
     session: AsyncSession = _SESSION,
     merchant_id: uuid.UUID = _MERCHANT,
 ) -> dict:
+    await _throttle_turn(session_id)
     async with session.begin():
         service = await _service_for_session(session, session_id)
         result = await service.send_message(
@@ -170,6 +182,8 @@ async def stream_message(
     """Same turn as ``/messages`` but Server-Sent Events: one ``data:`` frame per
     progress event, terminal frame is ``{"type": "done", ...}`` with the full turn
     result (or ``{"type": "error"}``)."""
+
+    await _throttle_turn(session_id)
 
     def _frame(payload: dict) -> str:
         return f"data: {json.dumps(payload)}\n\n"

@@ -10,7 +10,7 @@ import copy
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_commerce.keys import AgentPrincipal
@@ -29,9 +29,19 @@ _QUOTE_CREATE = Depends(require_scope("quote:create"))
 _ORDER_CREATE = Depends(require_scope("order:create"))
 _PAYMENT_REQUEST = Depends(require_scope("payment:request"))
 _TENANT_SESSION = Depends(get_agent_tenant_session)
-# Optional: well-behaved clients send a stable key for safe retries. If absent
-# (e.g. a ChatGPT Action that can't set it), we mint one so the call still works.
+# Mutating routes (create order, charge payment) REQUIRE a stable key so a
+# retried request can never create a second order / second charge. Read and
+# unconfirmed-probe routes don't take one.
 _IDEMPOTENCY_KEY = Header(default=None, alias="Idempotency-Key")
+
+
+def _require_idempotency_key(idempotency_key: str | None) -> str:
+    if not idempotency_key or not idempotency_key.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Idempotency-Key header is required for this operation",
+        )
+    return idempotency_key.strip()
 
 
 def _svc(session: AsyncSession, principal: AgentPrincipal) -> AgentCommerceService:
@@ -165,7 +175,7 @@ async def create_order(
     principal: AgentPrincipal = _ORDER_CREATE,
     session: AsyncSession = _TENANT_SESSION,
 ) -> dict:
-    idem = idempotency_key or f"auto-{uuid.uuid4()}"
+    idem = _require_idempotency_key(idempotency_key)
     async with session.begin():
         svc = _svc(session, principal)
 
@@ -205,7 +215,8 @@ async def request_payment(
     principal: AgentPrincipal = _PAYMENT_REQUEST,
     session: AsyncSession = _TENANT_SESSION,
 ) -> dict:
-    idem = idempotency_key or f"auto-{order_id}"
+    # The charging call must be idempotent; the unconfirmed probe is read-only.
+    idem = _require_idempotency_key(idempotency_key) if confirmed else f"probe-{order_id}"
     async with session.begin():
         svc = _svc(session, principal)
 

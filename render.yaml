@@ -12,7 +12,9 @@ services:
     plan: starter
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /docs
+    # Readiness probe: 200 only once the DB is reachable, so a deploy is not
+    # cut over to a backend that can't serve traffic.
+    healthCheckPath: /api/v1/health/ready
     # Runs migrations once before each deploy goes live (paid plans).
     # On the free plan, delete this and use:
     #   dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
@@ -21,7 +23,10 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: DATABASE_URL
-        sync: false # Supabase: postgresql+asyncpg://postgres:<pw>@db.<ref>.supabase.co:5432/postgres
+        # Use the Supabase SESSION POOLER (IPv4) — Render has no IPv6 egress, so the
+        # direct db.<ref>.supabase.co host is unreachable. Format:
+        # postgresql+asyncpg://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres
+        sync: false
       - key: CORS_ALLOW_ORIGINS
         sync: false # JSON list, e.g. ["https://commerceos.vercel.app"]
       - key: DEMO_MERCHANT_CODE
