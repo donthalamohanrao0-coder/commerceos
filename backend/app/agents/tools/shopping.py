@@ -10,8 +10,10 @@ import uuid
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.agents.context import ToolContext
+from app.agents.models import AgentSession
 from app.agents.tools.base import ToolRegistry
 from app.core.cache import cache_generation, cache_get, cache_key, cache_set
 from app.domains.campaigns.service import CampaignService
@@ -19,6 +21,7 @@ from app.domains.cart.service import CartService
 from app.domains.catalog.exceptions import ProductNotFound
 from app.domains.catalog.inventory_service import InsufficientStock
 from app.domains.catalog.service import CatalogService
+from app.domains.customers.models import Customer
 from app.domains.orders.exceptions import EmptyCart, OrderNotFound
 from app.domains.orders.service import OrderService
 from app.domains.payments.exceptions import PaymentPolicyDenied
@@ -275,11 +278,81 @@ class CampaignPreviewTool:
 # --------------------------------------------------------------------------- order + payment
 
 
+class SaveShippingDetailsTool:
+    name: ClassVar[str] = "save_shipping_details"
+    description: ClassVar[str] = (
+        "Save the customer's contact details and full delivery address. Call this "
+        "before order_create / payment_request. All fields except line2 and state "
+        "are required."
+    )
+
+    class Args(BaseModel):
+        name: str = Field(min_length=1, max_length=120)
+        email: str = Field(min_length=3, max_length=200)
+        phone: str = Field(min_length=4, max_length=20)
+        line1: str = Field(min_length=1, max_length=200)
+        line2: str | None = Field(default=None, max_length=200)
+        city: str = Field(min_length=1, max_length=100)
+        state: str | None = Field(default=None, max_length=100)
+        postal_code: str = Field(min_length=3, max_length=20)
+        country: str = Field(default="IN", max_length=60)
+
+    async def run(self, ctx: ToolContext, args: Args) -> dict[str, Any]:
+        # upsert the Customer (contact basics) — dedupe on email then phone
+        existing = await ctx.session.scalar(
+            select(Customer).where(
+                Customer.merchant_id == ctx.merchant_id,
+                (Customer.email == args.email) | (Customer.phone == args.phone),
+            )
+        )
+        customer = existing or Customer(
+            id=uuid.uuid4(), merchant_id=ctx.merchant_id, name=args.name
+        )
+        customer.name = args.name
+        customer.email = args.email
+        customer.phone = args.phone
+        customer.city = args.city
+        if existing is None:
+            ctx.session.add(customer)
+        await ctx.session.flush()
+
+        address = {
+            "name": args.name,
+            "phone": args.phone,
+            "email": args.email,
+            "line1": args.line1,
+            "line2": args.line2 or "",
+            "city": args.city,
+            "state": args.state or "",
+            "postal_code": args.postal_code,
+            "country": args.country,
+        }
+        ctx.shipping_address = address
+
+        agent_session = await ctx.session.get(AgentSession, ctx.agent_session_id)
+        if agent_session is not None:
+            agent_session.customer_id = customer.id
+            meta = dict(agent_session.session_metadata or {})
+            meta["shipping_address"] = address
+            agent_session.session_metadata = meta
+        if ctx.cart_id is not None:
+            from app.domains.cart.models import Cart
+
+            cart = await ctx.session.get(Cart, ctx.cart_id)
+            if cart is not None:
+                cart.customer_id = customer.id
+        ctx.customer_id = customer.id
+        await ctx.session.flush()
+
+        return {"status": "saved", "customer_id": str(customer.id), "shipping_address": address}
+
+
 class OrderCreateTool:
     name: ClassVar[str] = "order_create"
     description: ClassVar[str] = (
         "Convert the current cart into an order. The server re-validates stock, "
-        "re-prices every line and computes discount/shipping/tax/total."
+        "re-prices every line and computes discount/shipping/tax/total. Requires "
+        "save_shipping_details to have been called first."
     )
 
     class Args(BaseModel):
@@ -288,6 +361,11 @@ class OrderCreateTool:
     async def run(self, ctx: ToolContext, args: Args) -> dict[str, Any]:
         if ctx.cart_id is None:
             return {"error": "no_cart"}
+        if not ctx.shipping_address:
+            return {
+                "error": "missing_shipping_details",
+                "detail": "call save_shipping_details first",
+            }
         try:
             order = await OrderService(ctx.session).create_order_from_cart(
                 ctx.merchant_id,
@@ -295,6 +373,7 @@ class OrderCreateTool:
                 agent_session_id=ctx.agent_session_id,
                 actor_type="agent",
                 actor_id=str(ctx.agent_session_id),
+                shipping_address=ctx.shipping_address,
             )
         except EmptyCart:
             return {"error": "empty_cart"}
@@ -489,6 +568,7 @@ def build_shopping_registry() -> ToolRegistry:
             CartViewTool(),
             SuggestAddonsTool(),
             CampaignPreviewTool(),
+            SaveShippingDetailsTool(),
             OrderCreateTool(),
             PaymentRequestTool(),
         ]

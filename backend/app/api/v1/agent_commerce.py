@@ -186,7 +186,10 @@ async def create_order(
 
         async def _execute() -> dict[str, Any]:
             order = await svc.create_order(
-                principal.merchant_id, body.items, buyer_ref=body.buyer_ref
+                principal.merchant_id,
+                body.items,
+                buyer_ref=body.buyer_ref,
+                buyer=body.buyer,
             )
             return order.model_dump(mode="json")
 

@@ -142,6 +142,7 @@ class OrderService:
         actor_id: str | None,
         source: OrderSource | None = None,
         buyer_ref: str | None = None,
+        shipping_address: dict[str, str] | None = None,
     ) -> Order:
         cart = await self._session.get(Cart, cart_id)
         if cart is None or cart.merchant_id != merchant_id:
@@ -179,6 +180,7 @@ class OrderService:
             campaign_id=pricing.campaign_id,
             source=resolved_source,
             agent_session_id=agent_session_id,
+            shipping_address=shipping_address or None,
         )
         self._session.add(order)
         await self._session.flush()

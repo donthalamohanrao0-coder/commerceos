@@ -217,6 +217,17 @@ class FakeChatClient:
                 return call("cart_add_item", product_id=first_product, quantity=1)
             if "campaign_preview" in names and "campaign_preview" not in called:
                 return call("campaign_preview")
+            if "save_shipping_details" in names and "save_shipping_details" not in called:
+                return call(
+                    "save_shipping_details",
+                    name="Demo Buyer",
+                    email="demo.buyer@example.com",
+                    phone="+91-9000000000",
+                    line1="1 Demo Street",
+                    city="Bengaluru",
+                    postal_code="560001",
+                    country="IN",
+                )
             if "order_create" in names and "order_create" not in called:
                 return call("order_create")
             if "payment_request" in names and "payment_request" not in called and order_id:

@@ -147,15 +147,25 @@ def get_quote(items: list[dict[str, Any]]) -> Any:
 
 
 @mcp.tool()
-def place_order(items: list[dict[str, Any]], buyer_ref: str | None = None) -> Any:
+def place_order(
+    items: list[dict[str, Any]],
+    buyer_ref: str | None = None,
+    buyer: dict[str, Any] | None = None,
+) -> Any:
     """Place an order for the given line items. Idempotent — a fresh
     Idempotency-Key is generated per call. `buyer_ref` is your own PO reference.
-    Returns order_id, order_number, status and the priced totals. This does NOT
-    charge anything."""
+
+    `buyer` is the end customer you are purchasing for — pass it so the order has
+    a delivery address: {"name","email","phone","line1","city","postal_code",
+    "country", optionally "line2","state"}. It is stored as the customer and the
+    order's shipping address. Returns order_id, order_number, status, totals and
+    shipping_address. This does NOT charge anything."""
     headers = {"Idempotency-Key": f"mcp-{uuid.uuid4()}"}
     payload: dict[str, Any] = {"items": _line_items(items)}
     if buyer_ref:
         payload["buyer_ref"] = buyer_ref
+    if buyer:
+        payload["buyer"] = buyer
     return _call("POST", "/orders", json=payload, headers=headers)
 
 

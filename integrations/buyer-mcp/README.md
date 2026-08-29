@@ -109,6 +109,19 @@ Pass `mandate_reference`, `mandate_max_amount_paise` and `mandate_expires_at`
 mandate (`mandate_exceeded` / `mandate_expired`, nothing written) and records it
 verbatim in the `PAYMENT_CREATED` audit row.
 
+### Customer + shipping address
+
+Pass a `buyer` object to `place_order` — `{name, email, phone, line1, city,
+postal_code, country}` (plus optional `line2`, `state`). It is stored as the
+merchant's `Customer` and as the order's structured `shipping_address`, returned
+on `place_order` / `get_order`.
+
+### If the order stays "unpaid" after you paid the link
+
+The settlement webhook was missed or mis-signed. Unstick it:
+`POST /api/v1/console/payments/{payment_id}/reconcile` (merchant-authed) asks
+Razorpay directly and settles the order if the provider says it cleared.
+
 ## Local smoke test (no MCP client)
 
 ```bash

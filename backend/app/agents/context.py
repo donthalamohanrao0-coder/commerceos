@@ -20,5 +20,8 @@ class ToolContext:
     merchant_namespace: str = ""
     # mutated by cart tools so later tools in the same turn see the active cart
     cart_id: uuid.UUID | None = None
+    # {name, phone, email, line1, line2, city, state, postal_code, country} —
+    # set by save_shipping_details, read by order_create in the same turn
+    shipping_address: dict[str, str] | None = None
     # set by a tool that needs the human before the backend will act
     pending_approval: dict[str, object] | None = field(default=None)

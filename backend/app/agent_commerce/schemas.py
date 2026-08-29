@@ -25,9 +25,25 @@ class QuoteIn(BaseModel):
     items: list[LineItemIn] = Field(min_length=1, max_length=50)
 
 
+class BuyerIn(BaseModel):
+    """The end customer the AI buyer is purchasing for. Stored as a Customer and,
+    as a structured shipping address, on the order."""
+
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=3, max_length=200)
+    phone: str = Field(min_length=4, max_length=20)
+    line1: str = Field(min_length=1, max_length=200)
+    line2: str | None = Field(default=None, max_length=200)
+    city: str = Field(min_length=1, max_length=100)
+    state: str | None = Field(default=None, max_length=100)
+    postal_code: str = Field(min_length=3, max_length=20)
+    country: str = Field(default="IN", max_length=60)
+
+
 class CreateOrderIn(BaseModel):
     items: list[LineItemIn] = Field(min_length=1, max_length=50)
     buyer_ref: str | None = Field(default=None, max_length=200)
+    buyer: BuyerIn | None = None
 
 
 class PaymentMandateIn(BaseModel):
@@ -89,6 +105,7 @@ class OrderOut(BaseModel):
     tax_paise: int
     total_paise: int
     currency: str = "INR"
+    shipping_address: dict | None = None
 
 
 class PaymentOut(BaseModel):

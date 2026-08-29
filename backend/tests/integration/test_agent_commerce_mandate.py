@@ -17,10 +17,11 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent_commerce.schemas import PaymentMandateIn
+from app.agent_commerce.schemas import BuyerIn, LineItemIn, PaymentMandateIn
 from app.agent_commerce.service import AgentCommerceService
 from app.audit.models import AuditEvent
 from app.domains.cart.service import CartService
+from app.domains.customers.models import Customer
 from app.domains.orders.models import Order
 from app.domains.orders.service import OrderService
 from app.domains.payments.models import Payment
@@ -169,3 +170,37 @@ async def test_reconcile_settles_when_provider_says_paid(
 
     await db.refresh(order)
     assert order.status == "paid"
+
+
+async def test_buyer_block_creates_customer_and_shipping_address(
+    db: AsyncSession, merchant, cheap_product
+) -> None:
+    from app.domains.orders.models import Order as OrderModel
+
+    buyer = BuyerIn(
+        name="Asha Rao",
+        email="asha.rao@example.com",
+        phone="+91-9000000001",
+        line1="12 MG Road",
+        city="Bengaluru",
+        state="Karnataka",
+        postal_code="560001",
+        country="IN",
+    )
+    out = await _svc(db).create_order(
+        merchant.id,
+        [LineItemIn(product_id=cheap_product.id, quantity=1)],
+        buyer_ref="po-778",
+        buyer=buyer,
+    )
+    assert out.shipping_address is not None
+    assert out.shipping_address["city"] == "Bengaluru"
+    assert out.shipping_address["postal_code"] == "560001"
+
+    order = await db.get(OrderModel, out.order_id)
+    assert order.shipping_address["line1"] == "12 MG Road"
+    assert order.customer_id is not None
+
+    customer = await db.get(Customer, order.customer_id)
+    assert customer.email == "asha.rao@example.com"
+    assert customer.phone == "+91-9000000001"

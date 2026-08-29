@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_commerce.schemas import (
+    BuyerIn,
     CatalogSearchIn,
     LineItemIn,
     OrderOut,
@@ -25,10 +26,12 @@ from app.agent_commerce.schemas import (
     QuoteOut,
 )
 from app.audit.service import AuditService
+from app.domains.cart.models import Cart
 from app.domains.cart.service import CartService
 from app.domains.catalog.inventory_service import InventoryService
 from app.domains.catalog.models import Product
 from app.domains.catalog.service import CatalogService
+from app.domains.customers.models import Customer
 from app.domains.orders.exceptions import OrderNotFound
 from app.domains.orders.service import OrderService
 from app.domains.payments.exceptions import PaymentPolicyDenied
@@ -164,9 +167,50 @@ class AgentCommerceService:
         )
 
     async def create_order(
-        self, merchant_id: uuid.UUID, items: list[LineItemIn], *, buyer_ref: str | None
+        self,
+        merchant_id: uuid.UUID,
+        items: list[LineItemIn],
+        *,
+        buyer_ref: str | None,
+        buyer: BuyerIn | None = None,
     ) -> OrderOut:
         cart_id = await self._build_cart(merchant_id, items)
+
+        shipping_address: dict[str, str] | None = None
+        if buyer is not None:
+            customer = await self._session.scalar(
+                select(Customer).where(
+                    Customer.merchant_id == merchant_id,
+                    (Customer.email == buyer.email) | (Customer.phone == buyer.phone),
+                )
+            )
+            if customer is None:
+                customer = Customer(
+                    id=uuid.uuid4(), merchant_id=merchant_id, name=buyer.name
+                )
+                self._session.add(customer)
+            customer.name, customer.email, customer.phone, customer.city = (
+                buyer.name,
+                buyer.email,
+                buyer.phone,
+                buyer.city,
+            )
+            await self._session.flush()
+            cart = await self._session.get(Cart, cart_id)
+            if cart is not None:
+                cart.customer_id = customer.id
+            shipping_address = {
+                "name": buyer.name,
+                "phone": buyer.phone,
+                "email": buyer.email,
+                "line1": buyer.line1,
+                "line2": buyer.line2 or "",
+                "city": buyer.city,
+                "state": buyer.state or "",
+                "postal_code": buyer.postal_code,
+                "country": buyer.country,
+            }
+
         order = await self._orders.create_order_from_cart(
             merchant_id,
             cart_id,
@@ -175,6 +219,7 @@ class AgentCommerceService:
             actor_id=self._actor_id,
             source="external_ai_buyer",
             buyer_ref=buyer_ref,
+            shipping_address=shipping_address,
         )
         return OrderOut(
             order_id=order.id,
@@ -185,6 +230,7 @@ class AgentCommerceService:
             shipping_paise=order.shipping_paise,
             tax_paise=order.tax_paise,
             total_paise=order.total_paise,
+            shipping_address=order.shipping_address,
         )
 
     async def get_order(self, merchant_id: uuid.UUID, order_id: uuid.UUID) -> OrderOut:
@@ -201,6 +247,7 @@ class AgentCommerceService:
             shipping_paise=order.shipping_paise,
             tax_paise=order.tax_paise,
             total_paise=order.total_paise,
+            shipping_address=order.shipping_address,
         )
 
     async def request_payment(

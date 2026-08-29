@@ -33,6 +33,10 @@ It never touches an internal service endpoint or the database.
 - Scope `order:create`.
 - **`Idempotency-Key` header is required (HTTP 400 if absent).** The server does
   not mint one for a mutating external call — see ADR-009.
+- Optional **`buyer`** block (name, email, phone, line1/line2, city, state,
+  postal_code, country): upserted as a `Customer` and written to the order as a
+  structured `shipping_address`. (The in-app agent captures the same via a
+  `save_shipping_details` tool before `order_create`.)
 - `with_idempotency(operation="agent_commerce.create_order", key=…, payload=…)`:
   first call executes and stores the response; any repeat returns the stored
   response byte-for-byte — no second order.

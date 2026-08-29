@@ -176,6 +176,7 @@ class BaseAgentService(ABC):
             segment = customer.segment if customer else None
 
         cart_raw = agent_session.session_metadata.get("cart_id")
+        addr = agent_session.session_metadata.get("shipping_address")
         return ToolContext(
             session=self._session,
             merchant_id=agent_session.merchant_id,
@@ -184,6 +185,7 @@ class BaseAgentService(ABC):
             customer_segment=segment,
             merchant_namespace=namespace,
             cart_id=uuid.UUID(cart_raw) if cart_raw else None,
+            shipping_address=addr if isinstance(addr, dict) else None,
         )
 
     def _build_graph(self, ctx: ToolContext, merchant_id: uuid.UUID, session_id: uuid.UUID) -> Any:
