@@ -5,7 +5,7 @@ secrets-and-data-protection.md #2)."""
 import razorpay
 from razorpay.utility.utility import Utility
 
-from app.integrations.razorpay.base import RazorpayOrder
+from app.integrations.razorpay.base import RazorpayOrder, RazorpayPaymentLink
 
 
 class RealRazorpayClient:
@@ -29,6 +29,28 @@ class RealRazorpayClient:
             amount_paise=result["amount"],
             currency=result["currency"],
             receipt=result["receipt"],
+        )
+
+    def create_payment_link(
+        self, *, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]
+    ) -> RazorpayPaymentLink:
+        result = self._client.payment_link.create(
+            {
+                "amount": amount_paise,
+                "currency": "INR",
+                "accept_partial": False,
+                "reference_id": reference_id,
+                "description": description,
+                "notes": notes,
+                "reminder_enable": False,
+                "notify": {"sms": False, "email": False},
+            }
+        )
+        return RazorpayPaymentLink(
+            link_id=result["id"],
+            short_url=result["short_url"],
+            status=result.get("status", "created"),
+            amount_paise=result["amount"],
         )
 
     def verify_webhook_signature(self, *, body: bytes, signature: str) -> bool:

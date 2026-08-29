@@ -79,9 +79,35 @@ scopes it to this project. `.mcp.json` is git-ignored.)
 > **You:** Confirm.
 >
 > **Assistant:** *[request_payment confirmed=true]* → payment created, Razorpay
-> `order_TVBoDLtR…`. Done.
+> `order_TVBoDLtR…`, and a **`payment_link_url`**. Open it, pay with test card
+> `4111 1111 1111 1111` — the order settles to **paid** on Razorpay's webhook.
 
-Then check **Merchant console → Overview → Audit trail** and **→ Payments**.
+Then check **Merchant console → Agent activity** (actor `external_agent`) and
+**→ Payments**.
+
+## How the payment actually settles
+
+A headless agent can't run Razorpay Checkout, so `request_payment(confirmed=true)`
+returns a **Razorpay Payment Link** for the exact amount. Paying it (test card
+`4111 1111 1111 1111`) fires `payment_link.paid` / `payment.captured` to the
+backend's webhook, which flips the order to `paid` and writes `PAYMENT_SUCCEEDED`
+to the audit trail. This is the "agent proposes the exact amount, consent
+completes it" model (AP2 / ACP / UAP).
+
+**One-time backend setup** — Razorpay Dashboard → Settings → Webhooks → Add:
+
+| Field | Value |
+|---|---|
+| URL | `https://commerceos.onrender.com/api/v1/webhooks/razorpay` |
+| Secret | the value of `RAZORPAY_WEBHOOK_SECRET` on the backend (must match exactly) |
+| Active events | `payment.captured`, `payment.failed`, `payment_link.paid`, `order.paid` |
+
+### Delegated mandate (optional)
+
+Pass `mandate_reference`, `mandate_max_amount_paise` and `mandate_expires_at`
+(ISO 8601) to `request_payment` and the backend refuses to charge outside the
+mandate (`mandate_exceeded` / `mandate_expired`, nothing written) and records it
+verbatim in the `PAYMENT_CREATED` audit row.
 
 ## Local smoke test (no MCP client)
 

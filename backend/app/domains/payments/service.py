@@ -43,6 +43,7 @@ class PaymentService:
         agent_session_id: uuid.UUID | None,
         actor_type: ActorType,
         actor_id: str | None,
+        mandate: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """Returns a JSON-serializable dict (not the ORM Payment) because the
         response must be cacheable verbatim by with_idempotency for replay on a
@@ -90,11 +91,15 @@ class PaymentService:
             transition(payment, "pending")
             await self._session.flush()
 
+            audit_input: dict[str, object] | None = (
+                {"mandate": mandate} if mandate is not None else None
+            )
             await self._audit.record(
                 merchant_id=merchant_id,
                 actor_type=actor_type,
                 actor_id=actor_id,
                 session_id=agent_session_id,
+                input=audit_input,
                 order_id=order.id,
                 action="PAYMENT_CREATED",
                 result={
@@ -170,13 +175,26 @@ class PaymentService:
         }
 
     async def confirm_captured(self, *, provider_order_id: str) -> Payment:
-        """Called by the webhook handler after signature verification + dedup."""
+        """Called by the webhook handler (payment.captured / order.paid) after
+        signature verification + dedup."""
         payment = await self._session.scalar(
             select(Payment).where(Payment.provider_order_id == provider_order_id)
         )
         if payment is None:
             raise PaymentNotFound(provider_order_id)
+        return await self._settle(payment)
 
+    async def confirm_captured_by_payment_id(self, *, payment_id: uuid.UUID) -> Payment:
+        """Settlement path for a Razorpay Payment Link (payment_link.paid): the
+        link runs its own internal order, so the webhook cannot be matched on our
+        provider_order_id — it is matched on our payment id, carried in the link's
+        `notes` and echoed back on the event."""
+        payment = await self._session.get(Payment, payment_id)
+        if payment is None:
+            raise PaymentNotFound(str(payment_id))
+        return await self._settle(payment)
+
+    async def _settle(self, payment: Payment) -> Payment:
         if payment.status == "paid":
             return payment  # duplicate webhook delivery — no-op (payment-security.md #6)
 

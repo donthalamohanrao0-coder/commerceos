@@ -166,20 +166,45 @@ def get_order(order_id: str) -> Any:
 
 
 @mcp.tool()
-def request_payment(order_id: str, confirmed: bool = False) -> Any:
+def request_payment(
+    order_id: str,
+    confirmed: bool = False,
+    mandate_reference: str | None = None,
+    mandate_max_amount_paise: int | None = None,
+    mandate_expires_at: str | None = None,
+) -> Any:
     """Authorise payment for an order.
 
     ALWAYS call this first with confirmed=false. If the merchant policy requires
     it, that returns status "approval_required" and charges nothing — relay the
-    amount to the human and get an explicit yes. Only then call again with
-    confirmed=true, which is the buyer's consent signal and creates the payment
-    against Razorpay test mode. The confirmed call is idempotent."""
+    amount to the human and get an explicit yes.
+
+    Then call again with confirmed=true. That is the buyer's consent signal: it
+    creates the payment intent against Razorpay test mode AND returns
+    `payment_link_url` — a hosted Razorpay page. Give that URL to the human to
+    pay (test card 4111 1111 1111 1111); the order settles automatically once
+    Razorpay confirms. The confirmed call is idempotent.
+
+    Optionally pass a delegated mandate (the AP2/ACP/UAP model): all three of
+    mandate_reference, mandate_max_amount_paise and mandate_expires_at (ISO 8601,
+    e.g. 2026-08-30T12:00:00Z). The charge is refused if the order exceeds the
+    mandate or it has expired, and the mandate is recorded in the audit trail."""
     headers = {"Idempotency-Key": f"mcp-pay-{order_id}"}
+    body: dict[str, Any] | None = None
+    if mandate_reference and mandate_max_amount_paise and mandate_expires_at:
+        body = {
+            "mandate": {
+                "consent_reference": mandate_reference,
+                "max_amount_paise": int(mandate_max_amount_paise),
+                "expires_at": mandate_expires_at,
+            }
+        }
     return _call(
         "POST",
         f"/orders/{order_id}/payment",
         params={"confirmed": str(bool(confirmed)).lower()},
         headers=headers,
+        json=body,
     )
 
 

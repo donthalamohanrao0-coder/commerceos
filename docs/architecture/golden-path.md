@@ -55,15 +55,27 @@ It never touches an internal service endpoint or the database.
 - On allow: create `Payment`, call Razorpay to create a provider order,
   `transition(payment, "pending")`, audit **`PAYMENT_CREATED`** with
   `policy_decision={allowed: true, reason}`.
+- Optional **delegated mandate** on the confirm body (`consent_reference`,
+  `max_amount_paise`, `expires_at`): the charge is refused outside it
+  (`mandate_exceeded` / `mandate_expired`, nothing written) and it is recorded
+  verbatim in the `PAYMENT_CREATED` audit `input`. This is the AP2/ACP/UAP model.
+- The response carries a **Razorpay Payment Link** (`payment_link_url`) — the
+  external buyer has no browser to run Checkout, so it hands this hosted page to
+  its principal.
 - The whole thing is wrapped in `with_idempotency` — a retried confirm returns
   the same payment, never a second charge.
 
 ### 6. Settle — Razorpay webhook → `POST /api/v1/webhooks/razorpay`
+- The payment link is paid (test card `4111 1111 1111 1111`); Razorpay fires
+  `payment_link.paid` / `payment.captured`. (The in-app browser flow settles via
+  `POST /payments/{id}/verify` instead — same `_settle` code path.)
 - Signature verified with `RAZORPAY_WEBHOOK_SECRET`. Bad signature → rejected,
   no state change.
 - Provider event id deduplicated — a redelivered webhook is a no-op.
-- Payment state machine advances `pending → paid` (validated transition; an
-  illegal transition raises). Order moves to `paid`.
+- Matched to the `Payment` by `provider_order_id`, or by our payment id carried
+  in the link's `notes` (a payment link runs its own internal Razorpay order).
+- Payment state machine advances `pending → processing → paid` (validated
+  transitions). Order moves to `paid`.
 - Audit row: **`PAYMENT_SUCCEEDED`**.
 
 ### 7. Explain

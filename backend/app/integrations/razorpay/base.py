@@ -13,10 +13,27 @@ class RazorpayOrder:
     receipt: str
 
 
+@dataclass(frozen=True)
+class RazorpayPaymentLink:
+    link_id: str
+    short_url: str
+    status: str
+    amount_paise: int
+
+
 class RazorpayClient(Protocol):
     def create_order(
         self, *, amount_paise: int, receipt: str, notes: dict[str, str]
     ) -> RazorpayOrder: ...
+
+    def create_payment_link(
+        self, *, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]
+    ) -> RazorpayPaymentLink:
+        """A hosted Razorpay page for one order amount. When paid (test card
+        4111 1111 1111 1111) Razorpay fires `payment_link.paid` + `payment.captured`
+        webhooks carrying `notes`, which settle the CommerceOS payment. This is the
+        settlement path for an external AI buyer that has no browser to run Checkout."""
+        ...
 
     def verify_webhook_signature(self, *, body: bytes, signature: str) -> bool: ...
 

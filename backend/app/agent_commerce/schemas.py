@@ -4,6 +4,7 @@ payload is validated here — never an arbitrary dict (api-standards.md)."""
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +28,20 @@ class QuoteIn(BaseModel):
 class CreateOrderIn(BaseModel):
     items: list[LineItemIn] = Field(min_length=1, max_length=50)
     buyer_ref: str | None = Field(default=None, max_length=200)
+
+
+class PaymentMandateIn(BaseModel):
+    """The buyer agent's delegated spending authorisation (the AP2/ACP/UAP model).
+    Optional; when present the backend refuses to charge outside it and records it
+    verbatim in the PAYMENT_CREATED audit row."""
+
+    consent_reference: str = Field(min_length=1, max_length=200)
+    max_amount_paise: int = Field(ge=1)
+    expires_at: datetime
+
+
+class PaymentRequestIn(BaseModel):
+    mandate: PaymentMandateIn | None = None
 
 
 class ProductOut(BaseModel):
@@ -85,3 +100,7 @@ class PaymentOut(BaseModel):
     provider_order_id: str | None = None
     approval_id: uuid.UUID | None = None
     message: str | None = None
+    # Hosted Razorpay page to complete the charge (external AI buyer has no browser
+    # to run Checkout). Paying it fires the webhook that settles the order.
+    payment_link_url: str | None = None
+    payment_link_id: str | None = None

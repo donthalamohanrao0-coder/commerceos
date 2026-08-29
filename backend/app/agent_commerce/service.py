@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from app.agent_commerce.schemas import (
     CatalogSearchIn,
     LineItemIn,
     OrderOut,
+    PaymentMandateIn,
     PaymentOut,
     ProductOut,
     QuoteLineOut,
@@ -31,6 +33,7 @@ from app.domains.orders.exceptions import OrderNotFound
 from app.domains.orders.service import OrderService
 from app.domains.payments.exceptions import PaymentPolicyDenied
 from app.domains.payments.service import PaymentService
+from app.integrations.razorpay.factory import get_razorpay_client
 from app.policies.engine import PolicyEngine
 
 
@@ -201,11 +204,24 @@ class AgentCommerceService:
         )
 
     async def request_payment(
-        self, merchant_id: uuid.UUID, order_id: uuid.UUID, *, idempotency_key: str, confirmed: bool
+        self,
+        merchant_id: uuid.UUID,
+        order_id: uuid.UUID,
+        *,
+        idempotency_key: str,
+        confirmed: bool,
+        mandate: PaymentMandateIn | None = None,
     ) -> PaymentOut:
         """First call (confirmed=False) returns approval_required if the merchant
         policy demands confirmation; the buyer's explicit second call
-        (confirmed=True) is the consent signal (AP2/ACP mandate model)."""
+        (confirmed=True) is the consent signal (AP2/ACP/UAP mandate model).
+
+        On the confirmed call the backend creates the Razorpay payment intent and
+        a hosted Razorpay Payment Link for the exact amount — paying that link
+        fires the webhook that settles the order. An optional ``mandate`` is the
+        buyer's delegated authorisation: the charge is refused outside it, and it
+        is recorded verbatim in the audit trail.
+        """
         try:
             order = await self._orders.get_order(merchant_id, order_id)
         except OrderNotFound as exc:
@@ -221,9 +237,30 @@ class AgentCommerceService:
                 amount_paise=order.total_paise,
                 message=(
                     "Merchant policy requires explicit buyer confirmation. Re-call with "
-                    "confirmed=true to authorise payment."
+                    "confirmed=true (optionally with a mandate) to authorise payment."
                 ),
             )
+
+        mandate_dict: dict[str, object] | None = None
+        if mandate is not None:
+            if mandate.expires_at <= datetime.now(UTC):
+                return PaymentOut(
+                    order_id=order.id,
+                    status="mandate_expired",
+                    amount_paise=order.total_paise,
+                    message="The payment mandate has expired. Obtain a fresh authorisation.",
+                )
+            if mandate.max_amount_paise < order.total_paise:
+                return PaymentOut(
+                    order_id=order.id,
+                    status="mandate_exceeded",
+                    amount_paise=order.total_paise,
+                    message=(
+                        f"Mandate authorises up to {mandate.max_amount_paise} paise but the "
+                        f"order total is {order.total_paise} paise."
+                    ),
+                )
+            mandate_dict = mandate.model_dump(mode="json")
 
         try:
             result = await PaymentService(self._session).create_payment_intent(
@@ -233,6 +270,7 @@ class AgentCommerceService:
                 agent_session_id=None,
                 actor_type="external_agent",
                 actor_id=self._actor_id,
+                mandate=mandate_dict,
             )
         except PaymentPolicyDenied as exc:
             return PaymentOut(
@@ -241,10 +279,37 @@ class AgentCommerceService:
                 amount_paise=order.total_paise,
                 message=exc.reason,
             )
+
+        payment_id = uuid.UUID(str(result["payment_id"]))
+        link_url: str | None = None
+        link_id: str | None = None
+        try:
+            link = get_razorpay_client().create_payment_link(
+                amount_paise=int(str(result["amount_paise"])),
+                reference_id=f"{order.order_number}-{str(payment_id)[:8]}",
+                description=f"CommerceOS order {order.order_number}",
+                notes={
+                    "co_payment_id": str(payment_id),
+                    "co_order_id": str(order.id),
+                    "co_merchant_id": str(merchant_id),
+                },
+            )
+            link_url, link_id = link.short_url, link.link_id
+        except Exception:  # noqa: BLE001 - link is a convenience; the intent already exists
+            link_url = None
+
         return PaymentOut(
-            payment_id=uuid.UUID(str(result["payment_id"])),
+            payment_id=payment_id,
             order_id=order.id,
             status="payment_created",
             amount_paise=int(str(result["amount_paise"])),
             provider_order_id=str(result["provider_order_id"]),
+            payment_link_url=link_url,
+            payment_link_id=link_id,
+            message=(
+                "Pay the payment_link_url to complete the charge (test card "
+                "4111 1111 1111 1111). The order settles when Razorpay confirms."
+                if link_url
+                else "Payment intent created; complete it against provider_order_id."
+            ),
         )

@@ -2,6 +2,7 @@
 transition -> update DB -> audit (payment-security.md #5, exact sequence)."""
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy import select
@@ -63,17 +64,35 @@ async def razorpay_webhook(
             return ok({"status": "signature_invalid"})
 
         payment_service = PaymentService(session, razorpay_client)
-        entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
-        provider_order_id = entity.get("order_id")
+        entities = payload.get("payload", {})
+        payment_entity = entities.get("payment", {}).get("entity", {})
+        link_entity = entities.get("payment_link", {}).get("entity", {})
+        order_entity = entities.get("order", {}).get("entity", {})
 
-        if provider_order_id:
-            if event_type == "payment.captured":
-                await payment_service.confirm_captured(provider_order_id=provider_order_id)
-            elif event_type == "payment.failed":
-                reason = entity.get("error_description", "payment_failed")
-                await payment_service.confirm_failed(
-                    provider_order_id=provider_order_id, reason=reason
+        # notes ride on whichever entity carries them; the payment-link path stamps
+        # our own payment id there because the link runs its own internal order.
+        notes = (
+            payment_entity.get("notes")
+            or link_entity.get("notes")
+            or order_entity.get("notes")
+            or {}
+        )
+        co_payment_id = notes.get("co_payment_id") if isinstance(notes, dict) else None
+        provider_order_id = payment_entity.get("order_id") or order_entity.get("id")
+
+        paid_events = {"payment.captured", "order.paid", "payment_link.paid"}
+        if event_type in paid_events:
+            if co_payment_id:
+                await payment_service.confirm_captured_by_payment_id(
+                    payment_id=UUID(str(co_payment_id))
                 )
+            elif provider_order_id:
+                await payment_service.confirm_captured(provider_order_id=provider_order_id)
+        elif event_type == "payment.failed" and provider_order_id:
+            reason = payment_entity.get("error_description", "payment_failed")
+            await payment_service.confirm_failed(
+                provider_order_id=provider_order_id, reason=reason
+            )
 
         event.processing_status = "processed"
         event.processed_at = datetime.now(UTC)

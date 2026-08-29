@@ -14,7 +14,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_commerce.keys import AgentPrincipal
-from app.agent_commerce.schemas import CatalogSearchIn, CreateOrderIn, QuoteIn
+from app.agent_commerce.schemas import (
+    CatalogSearchIn,
+    CreateOrderIn,
+    PaymentRequestIn,
+    QuoteIn,
+)
 from app.agent_commerce.service import AgentCommerceService
 from app.api.deps import get_agent_tenant_session, require_scope
 from app.api.envelope import ok
@@ -211,12 +216,14 @@ async def get_order(
 async def request_payment(
     order_id: uuid.UUID,
     confirmed: bool = False,
+    body: PaymentRequestIn | None = None,
     idempotency_key: str | None = _IDEMPOTENCY_KEY,
     principal: AgentPrincipal = _PAYMENT_REQUEST,
     session: AsyncSession = _TENANT_SESSION,
 ) -> dict:
     # The charging call must be idempotent; the unconfirmed probe is read-only.
     idem = _require_idempotency_key(idempotency_key) if confirmed else f"probe-{order_id}"
+    mandate = body.mandate if body else None
     async with session.begin():
         svc = _svc(session, principal)
 
@@ -226,6 +233,7 @@ async def request_payment(
                 order_id,
                 idempotency_key=idem,
                 confirmed=confirmed,
+                mandate=mandate,
             )
             return payment.model_dump(mode="json")
 
@@ -237,7 +245,11 @@ async def request_payment(
                 merchant_id=principal.merchant_id,
                 operation="agent_commerce.request_payment",
                 idempotency_key=idem,
-                request_payload={"order_id": str(order_id), "confirmed": True},
+                request_payload={
+                    "order_id": str(order_id),
+                    "confirmed": True,
+                    "mandate": mandate.model_dump(mode="json") if mandate else None,
+                },
                 execute=_execute,
             )
         else:

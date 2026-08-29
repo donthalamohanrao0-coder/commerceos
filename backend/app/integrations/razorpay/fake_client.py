@@ -6,7 +6,7 @@ import hmac
 import json
 import uuid
 
-from app.integrations.razorpay.base import RazorpayOrder
+from app.integrations.razorpay.base import RazorpayOrder, RazorpayPaymentLink
 
 FAKE_WEBHOOK_SECRET = "fake-local-webhook-secret"
 
@@ -14,6 +14,7 @@ FAKE_WEBHOOK_SECRET = "fake-local-webhook-secret"
 class FakeRazorpayClient:
     def __init__(self) -> None:
         self.created_orders: dict[str, RazorpayOrder] = {}
+        self.created_links: dict[str, RazorpayPaymentLink] = {}
 
     def create_order(
         self, *, amount_paise: int, receipt: str, notes: dict[str, str]
@@ -26,6 +27,19 @@ class FakeRazorpayClient:
         )
         self.created_orders[order.provider_order_id] = order
         return order
+
+    def create_payment_link(
+        self, *, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]
+    ) -> RazorpayPaymentLink:
+        link_id = f"plink_fake_{uuid.uuid4().hex[:14]}"
+        link = RazorpayPaymentLink(
+            link_id=link_id,
+            short_url=f"https://rzp.test/i/{link_id}",
+            status="created",
+            amount_paise=amount_paise,
+        )
+        self.created_links[link_id] = link
+        return link
 
     def verify_webhook_signature(self, *, body: bytes, signature: str) -> bool:
         expected = hmac.new(FAKE_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
