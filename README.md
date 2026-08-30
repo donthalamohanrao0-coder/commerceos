@@ -8,11 +8,21 @@ Built for the Razorpay Buildathon · *AI Growth & Agentic Commerce*
 
 `Next.js` · `FastAPI` · `LangGraph` · `Supabase` · `Pinecone` · `Razorpay (test mode)`
 
+<br/>
+
+<img src="presentation/assets/images/readme-intro.png" alt="Hi, I'm Mohan — third-year at NIT Raipur. Shipped 20+ AI projects for clients across the US and India, make agentic-AI content on YouTube, working full-time in agentic AI since January 2025. CommerceOS is an AI-native commerce platform built for the Razorpay Buildathon." width="880">
+
 </div>
 
 ---
 
 ## The problem
+
+<div align="center">
+
+<img src="presentation/assets/images/readme-problem.png" alt="The problem: storefronts aren't machine-consumable (no clean catalog API, no authoritative price, no safe way to let software pay) and nobody trusts AI near money (hallucinated prices, runaway tool loop, prompt injection in docs, a charge with no consent and no record). CommerceOS answers both, on one principle: the AI can only propose a money action — deterministic backend services, policies and state machines validate and execute it, and every step lands in an append-only audit trail." width="920">
+
+</div>
 
 Commerce is built for a human clicking a mouse. Agents are about to be both the **buyers** and the merchant's **sales force**, and three things break:
 
@@ -55,9 +65,9 @@ Three kinds of actor talk to one modular-monolith backend. Everything sensitive 
 ```mermaid
 flowchart TB
   subgraph Actors
-    C["🧑 Customer<br/>(plain-language shopping)"]
-    M["🧑‍💼 Merchant operator<br/>(console)"]
-    B["🤖 External AI buyer<br/>(Claude Desktop / any MCP or HTTP client)"]
+    C["🧑 Customer<br/>(plain-language shopping)"]:::act
+    M["🧑‍💼 Merchant operator<br/>(console)"]:::act
+    B["🤖 External AI buyer<br/>(Claude Desktop / any MCP or HTTP client)"]:::act
   end
 
   subgraph Edge["Edge — Vercel"]
@@ -88,12 +98,12 @@ flowchart TB
   end
 
   subgraph Data["Data & external"]
-    PG[("Supabase Postgres<br/>RLS + SET LOCAL ROLE app_request")]
-    PC[("Pinecone<br/>namespace per merchant")]
-    RD[("Redis<br/>cache + rate limit")]
-    OAI["OpenAI<br/>gpt-4o-mini + embeddings"]
-    RZP["Razorpay<br/>test-mode APIs + webhooks"]
-    LF["Langfuse<br/>agent traces"]
+    PG[("Supabase Postgres<br/>RLS + SET LOCAL ROLE app_request")]:::ext
+    PC[("Pinecone<br/>namespace per merchant")]:::ext
+    RD[("Redis<br/>cache + rate limit")]:::ext
+    OAI["OpenAI<br/>gpt-4o-mini + embeddings"]:::ext
+    RZP["Razorpay<br/>test-mode APIs + webhooks"]:::ext
+    LF["Langfuse<br/>agent traces"]:::ext
   end
 
   C -->|HTTPS / SSE| WEB
@@ -116,11 +126,20 @@ flowchart TB
   RZP -->|"signed webhook → /webhooks/razorpay"| API
   AG --> LF
 
-  classDef d fill:#dbfaad,stroke:#608520;
-  classDef t fill:#f8d3af,stroke:#9b4a07;
+  classDef act fill:#EDEBFE,stroke:#7E3AF2,stroke-width:2px,color:#4A1D96;
+  classDef d fill:#DEF7EC,stroke:#057A55,stroke-width:2px,color:#03543F;
+  classDef t fill:#FCE7C3,stroke:#C05621,stroke-width:2px,color:#7B341E;
+  classDef ext fill:#E1EFFE,stroke:#3F83F8,stroke-width:2px,color:#1E429F;
+
+  style Actors fill:#F9FAFB,stroke:#D1D5DB,color:#374151
+  style Edge fill:#F9FAFB,stroke:#D1D5DB,color:#374151
+  style App fill:#F9FAFB,stroke:#9CA3AF,color:#374151
+  style Domains fill:#ECFDF3,stroke:#A6F4C5,color:#03543F
+  style Platform fill:#FFF6ED,stroke:#FDD8B5,color:#7B341E
+  style Data fill:#F9FAFB,stroke:#D1D5DB,color:#374151
 ```
 
-> **What this shows.** The whole system on one page. Three kinds of caller on the left (a shopping customer, a merchant operator, an external AI buyer) all reach one FastAPI backend. Inside it, green **domain services** own the business facts — prices, stock, order and payment state — and the orange **platform / trust** blocks (policy engine, approvals, append-only audit, idempotency, the agent runtime, RAG) sit between the AI and any side effect. On the right are the managed dependencies. Nothing sensitive is decided in the browser or by the LLM.
+> **What this shows.** The whole system on one page. **Purple** = the three kinds of caller (a shopping customer, a merchant operator, an external AI buyer) — they all reach one FastAPI backend. Inside it, **green** = domain services that own the business facts (prices, stock, order and payment state); **orange** = the platform / trust blocks (policy engine, approvals, append-only audit, idempotency, the agent runtime, RAG) that sit between the AI and any side effect. **Blue** = managed dependencies. Nothing sensitive is decided in the browser or by the LLM.
 
 **Why a modular monolith?** Clear domain boundaries without the deployment, networking and consistency tax of microservices — with the extraction seams left in place. See [ADR-001](docs/architecture/decisions/ADR-001-modular-monolith.md).
 
