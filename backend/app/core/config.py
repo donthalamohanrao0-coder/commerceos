@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     app_name: str = "CommerceOS API"
     api_prefix: str = "/api/v1"
 
+    # Absolute origin this API is reachable at. Used to build the hosted checkout
+    # URL handed to an external AI buyer (which has no browser to run Checkout).
+    # Set PUBLIC_BASE_URL on the host, e.g. https://commerceos.onrender.com
+    public_base_url: str = "http://localhost:8000"
+
     database_url: str = "postgresql+asyncpg://commerceos:commerceos@localhost:5432/commerceos"
 
     redis_url: str = "redis://localhost:6379/0"

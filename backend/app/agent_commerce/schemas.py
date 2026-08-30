@@ -117,7 +117,12 @@ class PaymentOut(BaseModel):
     provider_order_id: str | None = None
     approval_id: uuid.UUID | None = None
     message: str | None = None
-    # Hosted Razorpay page to complete the charge (external AI buyer has no browser
-    # to run Checkout). Paying it fires the webhook that settles the order.
+    # Hand this to a human: our own hosted Razorpay Checkout page for this exact
+    # order. Completing it settles the order automatically. Always present on a
+    # confirmed call — it needs no Razorpay call at request time.
+    checkout_url: str | None = None
+    # Best-effort Razorpay Payment Link (test mode caps an account at 30). Prefer
+    # checkout_url; link_error explains why the link is absent when it is.
     payment_link_url: str | None = None
     payment_link_id: str | None = None
+    link_error: str | None = None

@@ -79,8 +79,8 @@ scopes it to this project. `.mcp.json` is git-ignored.)
 > **You:** Confirm.
 >
 > **Assistant:** *[request_payment confirmed=true]* → payment created, Razorpay
-> `order_TVBoDLtR…`, and a **`payment_link_url`**. Open it, pay with test card
-> `4111 1111 1111 1111` — the order settles to **paid** on Razorpay's webhook.
+> `order_TVBoDLtR…`, and a **`checkout_url`**. Open it, pay with test card
+> `4111 1111 1111 1111` — the order settles to **paid** automatically.
 
 Then check **Merchant console → Agent activity** (actor `external_agent`) and
 **→ Payments**.
@@ -88,13 +88,21 @@ Then check **Merchant console → Agent activity** (actor `external_agent`) and
 ## How the payment actually settles
 
 A headless agent can't run Razorpay Checkout, so `request_payment(confirmed=true)`
-returns a **Razorpay Payment Link** for the exact amount. Paying it (test card
-`4111 1111 1111 1111`) fires `payment_link.paid` / `payment.captured` to the
-backend's webhook, which flips the order to `paid` and writes `PAYMENT_SUCCEEDED`
-to the audit trail. This is the "agent proposes the exact amount, consent
-completes it" model (AP2 / ACP / UAP).
+returns a **`checkout_url`** — `https://commerceos.onrender.com/pay/{payment_id}`,
+a one-page CommerceOS checkout for that exact order. A human opens it, Razorpay
+Checkout runs there against the order the backend already created, and the browser
+posts the signed result to `/pay/{payment_id}/callback`, which verifies the
+signature server-side and flips the order to `paid` (writing `PAYMENT_SUCCEEDED`
+to the audit trail — the same code path a webhook takes). This is the "agent
+proposes the exact amount, consent completes it" model (AP2 / ACP / UAP). No
+third-party link quota; identical in production.
 
-**One-time backend setup** — Razorpay Dashboard → Settings → Webhooks → Add:
+The response may *also* carry a `payment_link_url` (a Razorpay Payment Link) when
+one could be minted — but **test mode caps an account at 30 links**, so once that
+is exhausted `link_error` explains the absence and you use `checkout_url`.
+
+**Optional backend setup** (only needed for the Payment Link path / failure
+events) — Razorpay Dashboard → Settings → Webhooks → Add:
 
 | Field | Value |
 |---|---|
@@ -116,9 +124,9 @@ postal_code, country}` (plus optional `line2`, `state`). It is stored as the
 merchant's `Customer` and as the order's structured `shipping_address`, returned
 on `place_order` / `get_order`.
 
-### If the order stays "unpaid" after you paid the link
+### If the order stays "unpaid" after you paid
 
-The settlement webhook was missed or mis-signed. Unstick it:
+The `/pay` callback or a settlement webhook was missed. Unstick it:
 `POST /api/v1/console/payments/{payment_id}/reconcile` (merchant-authed) asks
 Razorpay directly and settles the order if the provider says it cleared.
 

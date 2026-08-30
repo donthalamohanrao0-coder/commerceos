@@ -1,13 +1,15 @@
 """External AI-buyer payment: the delegated-mandate check and the hosted
-payment-link settlement path (the AP2/ACP/UAP model the Razorpay brief points at).
+checkout / settlement path (the AP2/ACP/UAP model the Razorpay brief points at).
 
-  * a confirmed request without a mandate still works and returns a payment link;
+  * a confirmed request without a mandate still works and always returns a
+    hosted checkout_url (a Payment Link is best-effort — test mode caps it at 30);
   * a mandate whose ceiling is below the order total refuses the charge, nothing
     written;
   * an expired mandate refuses the charge;
   * a valid mandate is accepted and recorded verbatim in the PAYMENT_CREATED audit row;
-  * paying the link (simulated payment_link.paid webhook, matched on the payment id
-    in `notes`) settles the order to `paid` with a PAYMENT_SUCCEEDED audit row.
+  * settling by payment id (simulated payment_link.paid webhook / hosted-checkout
+    callback, matched on the payment id) flips the order to `paid` with a
+    PAYMENT_SUCCEEDED audit row.
 """
 
 import uuid
@@ -44,7 +46,7 @@ def _svc(db: AsyncSession) -> AgentCommerceService:
     return AgentCommerceService(db, actor_id="agent_key:test")
 
 
-async def test_confirmed_without_mandate_returns_payment_link(
+async def test_confirmed_without_mandate_returns_checkout_url(
     db: AsyncSession, merchant, cheap_product
 ) -> None:
     oid = await _order_id(db, merchant, cheap_product)
@@ -53,7 +55,10 @@ async def test_confirmed_without_mandate_returns_payment_link(
     )
     assert out.status == "payment_created"
     assert out.provider_order_id
-    assert out.payment_link_url and out.payment_link_id
+    # checkout_url is unconditional — it needs no Razorpay call at request time.
+    assert out.checkout_url and out.checkout_url.endswith(f"/pay/{out.payment_id}")
+    # a Payment Link is a bonus; when it cannot be minted, link_error says why.
+    assert bool(out.payment_link_url) == (out.link_error is None)
 
 
 async def test_mandate_ceiling_below_total_refuses(
@@ -88,9 +93,7 @@ async def test_expired_mandate_refuses(db: AsyncSession, merchant, cheap_product
     assert not list(await db.scalars(select(Payment).where(Payment.order_id == oid)))
 
 
-async def test_valid_mandate_recorded_in_audit(
-    db: AsyncSession, merchant, cheap_product
-) -> None:
+async def test_valid_mandate_recorded_in_audit(db: AsyncSession, merchant, cheap_product) -> None:
     oid = await _order_id(db, merchant, cheap_product)
     order = await db.get(Order, oid)
     mandate = PaymentMandateIn(
@@ -104,15 +107,13 @@ async def test_valid_mandate_recorded_in_audit(
     assert out.status == "payment_created"
 
     row = await db.scalar(
-        select(AuditEvent).where(
-            AuditEvent.order_id == oid, AuditEvent.action == "PAYMENT_CREATED"
-        )
+        select(AuditEvent).where(AuditEvent.order_id == oid, AuditEvent.action == "PAYMENT_CREATED")
     )
     assert row is not None
     assert row.input == {"mandate": mandate.model_dump(mode="json")}
 
 
-async def test_payment_link_paid_settles_order(
+async def test_settle_by_payment_id_settles_order(
     db: AsyncSession, merchant, cheap_product
 ) -> None:
     oid = await _order_id(db, merchant, cheap_product)
@@ -121,8 +122,8 @@ async def test_payment_link_paid_settles_order(
     )
     assert out.payment_id is not None
 
-    # what the webhook handler does after signature-verify + dedup for a
-    # payment_link.paid event whose notes carry our payment id.
+    # what the webhook handler (payment_link.paid, notes carry our payment id) and
+    # the hosted-checkout callback both funnel into.
     settled = await PaymentService(db).confirm_captured_by_payment_id(payment_id=out.payment_id)
     assert settled.status == "paid"
 

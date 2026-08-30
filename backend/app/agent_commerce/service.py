@@ -7,6 +7,7 @@ actor_type='external_agent' for the audit trail.
 from __future__ import annotations
 
 import base64
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,6 +27,7 @@ from app.agent_commerce.schemas import (
     QuoteOut,
 )
 from app.audit.service import AuditService
+from app.core.config import get_settings
 from app.domains.cart.models import Cart
 from app.domains.cart.service import CartService
 from app.domains.catalog.inventory_service import InventoryService
@@ -38,6 +40,8 @@ from app.domains.payments.exceptions import PaymentPolicyDenied
 from app.domains.payments.service import PaymentService
 from app.integrations.razorpay.factory import get_razorpay_client
 from app.policies.engine import PolicyEngine
+
+_log = logging.getLogger(__name__)
 
 
 class AgentOrderNotFound(Exception):
@@ -185,9 +189,7 @@ class AgentCommerceService:
                 )
             )
             if customer is None:
-                customer = Customer(
-                    id=uuid.uuid4(), merchant_id=merchant_id, name=buyer.name
-                )
+                customer = Customer(id=uuid.uuid4(), merchant_id=merchant_id, name=buyer.name)
                 self._session.add(customer)
             customer.name, customer.email, customer.phone, customer.city = (
                 buyer.name,
@@ -328,8 +330,16 @@ class AgentCommerceService:
             )
 
         payment_id = uuid.UUID(str(result["payment_id"]))
+
+        # Primary: our own hosted Checkout page for this order. No Razorpay call
+        # here, so it is always available regardless of the test-mode link quota.
+        checkout_url = f"{get_settings().public_base_url.rstrip('/')}/pay/{payment_id}"
+
+        # Best effort: also mint a Razorpay Payment Link. Test mode caps an account
+        # at 30 links, so this fails eventually — log it loudly, never swallow.
         link_url: str | None = None
         link_id: str | None = None
+        link_error: str | None = None
         try:
             link = get_razorpay_client().create_payment_link(
                 amount_paise=int(str(result["amount_paise"])),
@@ -345,8 +355,13 @@ class AgentCommerceService:
             await PaymentService(self._session).attach_payment_link(
                 payment_id, link_id=link.link_id, link_url=link.short_url
             )
-        except Exception:  # noqa: BLE001 - link is a convenience; the intent already exists
-            link_url = None
+        except Exception as exc:  # noqa: BLE001 - link is a bonus; checkout_url stands alone
+            link_error = f"{type(exc).__name__}: {exc}"
+            _log.warning(
+                "payment link unavailable for %s (%s) — buyer uses checkout_url instead",
+                order.order_number,
+                link_error,
+            )
 
         return PaymentOut(
             payment_id=payment_id,
@@ -354,12 +369,13 @@ class AgentCommerceService:
             status="payment_created",
             amount_paise=int(str(result["amount_paise"])),
             provider_order_id=str(result["provider_order_id"]),
+            checkout_url=checkout_url,
             payment_link_url=link_url,
             payment_link_id=link_id,
+            link_error=link_error,
             message=(
-                "Pay the payment_link_url to complete the charge (test card "
-                "4111 1111 1111 1111). The order settles when Razorpay confirms."
-                if link_url
-                else "Payment intent created; complete it against provider_order_id."
+                "Give checkout_url to the buyer to complete payment (test card "
+                "4111 1111 1111 1111). The order settles automatically once Razorpay "
+                "confirms."
             ),
         )

@@ -191,9 +191,12 @@ def request_payment(
 
     Then call again with confirmed=true. That is the buyer's consent signal: it
     creates the payment intent against Razorpay test mode AND returns
-    `payment_link_url` — a hosted Razorpay page. Give that URL to the human to
-    pay (test card 4111 1111 1111 1111); the order settles automatically once
-    Razorpay confirms. The confirmed call is idempotent.
+    `checkout_url` — a hosted CommerceOS checkout page for this exact order. Give
+    that URL to the human to pay (test card 4111 1111 1111 1111); the order
+    settles automatically once Razorpay confirms. A `payment_link_url` may also be
+    present (a Razorpay Payment Link) but test mode caps those at 30 per account —
+    prefer `checkout_url`, and `link_error` says why the link is absent. The
+    confirmed call is idempotent.
 
     Optionally pass a delegated mandate (the AP2/ACP/UAP model): all three of
     mandate_reference, mandate_max_amount_paise and mandate_expires_at (ISO 8601,

@@ -333,7 +333,13 @@ sequenceDiagram
   P->>P: pending → processing → paid · order → paid · audit PAYMENT_SUCCEEDED
 ```
 
-### External AI buyer (no browser → hosted Payment Link + webhook)
+### External AI buyer (no browser → hosted checkout page)
+
+The agent has no browser to run Razorpay Checkout, so `confirmed=true` returns a
+`checkout_url` — our own one-page checkout (`/pay/{payment_id}`) for that exact
+order. A human opens it; Checkout runs there and the signed result posts back to
+`/pay/{id}/callback`, which verifies server-side and settles — the same code path
+a webhook takes, with no Payment-Link quota (test mode caps those at 30).
 
 ```mermaid
 sequenceDiagram
@@ -341,8 +347,8 @@ sequenceDiagram
   participant B as AI buyer (MCP)
   participant API as agent-commerce API
   participant P as PaymentService
+  participant H as /pay page + callback
   participant RZP as Razorpay (test)
-  participant WH as webhook endpoint
   B->>API: POST /orders {items, buyer{name,email,phone,address}}  (Idempotency-Key required)
   API-->>B: order + shipping_address · audit ORDER_CREATED
   B->>API: POST /orders/{id}/payment?confirmed=false
@@ -350,16 +356,18 @@ sequenceDiagram
   B->>API: POST /orders/{id}/payment?confirmed=true  {mandate?: {max_amount_paise, expires_at}}
   API->>API: mandate check — refuse if order > mandate or expired
   API->>P: create_payment_intent (policy re-checked at execution time)
-  P->>RZP: payment_link.create(amount, notes.co_payment_id)
-  API-->>B: {status: payment_created, payment_link_url}
-  B-->>RZP: (human) pays the link with a test card
-  RZP->>WH: payment_link.paid / payment.captured  (signed)
-  WH->>WH: verify signature → dedupe event id
-  WH->>P: match by notes.co_payment_id then _settle()
+  API-->>B: {status: payment_created, checkout_url}
+  B-->>H: (human) opens checkout_url
+  H->>RZP: Razorpay Checkout (test card 4111 1111 1111 1111)
+  RZP-->>H: {razorpay_payment_id, order_id, signature}
+  H->>P: POST /pay/{id}/callback → verify signature → _settle()
   P->>P: paid · order → paid · audit PAYMENT_SUCCEEDED
 ```
 
-**If a webhook is missed or mis-signed:** console → Payments → **Reconcile** (`POST /console/payments/{id}/reconcile`) asks Razorpay directly and settles if the provider says it cleared.
+A signed `payment_link.paid` / `payment.captured` webhook settles the same way
+when a Razorpay Payment Link *was* minted (matched by `notes.co_payment_id`).
+
+**If the callback or a webhook is missed:** console → Payments → **Reconcile** (`POST /console/payments/{id}/reconcile`) asks Razorpay directly and settles if the provider says it cleared.
 
 ### Payment state machine
 
