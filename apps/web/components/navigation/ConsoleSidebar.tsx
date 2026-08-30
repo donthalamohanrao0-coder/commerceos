@@ -25,6 +25,7 @@ const groups: { label: string; items: { href: string; label: string; exact?: boo
   {
     label: "Agents",
     items: [
+      { href: "/console/assistant", label: "Growth assistant" },
       { href: "/console/activity", label: "Agent activity" },
       { href: "/console/approvals", label: "Approvals" },
       { href: "/console/knowledge", label: "Knowledge base" },
