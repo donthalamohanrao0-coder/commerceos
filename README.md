@@ -24,7 +24,7 @@ CommerceOS answers **both** directions of the brief:
 
 | Track | What it delivers |
 |---|---|
-| **Grow the merchant's revenue** | a growth agent + analytics + upsell/cross-sell tied to real campaigns, all gated on merchant approval |
+| **Grow the merchant's revenue** | a growth agent (Console → **Growth assistant**) + analytics + upsell/cross-sell tied to real campaigns, all gated on merchant approval |
 | **Make the merchant transactable by an AI buyer, end to end** | a scoped-key API + MCP server: `catalog → authoritative quote → idempotent order → consent-gated payment` on real Razorpay test rails |
 
 > **Core principle.** The AI may *propose* a money action. Deterministic backend services, policies and state machines decide whether it's allowed and execute it — and every step lands in an append-only audit trail.
@@ -265,6 +265,8 @@ flowchart TB
 > **What this shows.** How "multi-agent" actually works here. A lightweight **supervisor** reads the first message and picks one of three specialist agents — shopping, support, or growth — *once*, and that choice is fixed for the session (weak signals get a cached one-word LLM tie-breaker). There are no mid-conversation hand-offs to go wrong. All three specialists then run the **same** bounded plan/act loop; only the prompt and the tool list differ.
 
 Each graph is built by `BaseAgentService` from three pieces: a **system prompt**, a **tool registry**, and the shared **graph shape**. Bounds (`max_graph_steps`, `max_tool_calls`, wall-clock `deadline`) come from `PolicyEngine.get_agent_limits(merchant_id)` and are enforced inside `agent_node` — the merchant can only tighten them.
+
+**Who talks to which agent.** A *customer* reaches the shopping and support agents through the storefront chat (`/chat`). A *merchant* reaches the growth agent through **Console → Growth assistant** — a dedicated chat surface that starts a `workflow: "growth"` session: ask *"where can I grow revenue?"*, the agent reads live analytics, spots a cross-sell pattern, and drafts a policy-capped campaign. It **cannot activate anything** — `request_campaign_approval` parks the turn, and an inline Approve / Decline card (and the [Approvals](#the-trust-layer) queue) is the only way the campaign goes live. The reasoning trace lands in **Console → Agent activity** like every other agent run.
 
 Details: [`docs/ai/agent-architecture.md`](docs/ai/agent-architecture.md) · [ADR-004](docs/architecture/decisions/ADR-004-langgraph.md) · [ADR-007 (per-turn state, no checkpointer)](docs/architecture/decisions/ADR-007-per-turn-agent-state.md).
 
