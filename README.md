@@ -120,6 +120,8 @@ flowchart TB
   classDef t fill:#f8d3af,stroke:#9b4a07;
 ```
 
+> **What this shows.** The whole system on one page. Three kinds of caller on the left (a shopping customer, a merchant operator, an external AI buyer) all reach one FastAPI backend. Inside it, green **domain services** own the business facts — prices, stock, order and payment state — and the orange **platform / trust** blocks (policy engine, approvals, append-only audit, idempotency, the agent runtime, RAG) sit between the AI and any side effect. On the right are the managed dependencies. Nothing sensitive is decided in the browser or by the LLM.
+
 **Why a modular monolith?** Clear domain boundaries without the deployment, networking and consistency tax of microservices — with the extraction seams left in place. See [ADR-001](docs/architecture/decisions/ADR-001-modular-monolith.md).
 
 ---
@@ -157,6 +159,8 @@ flowchart LR
   MCP -->|"Bearer ack_live_…"| APIS
 ```
 
+> **What this shows.** Where each piece actually runs. A push to GitHub deploys the Next.js app to **Vercel** and the API + Celery worker to **Render** (the API runs `alembic upgrade head` before every deploy). Postgres, Auth and Storage are **Supabase**; the vector store is **Pinecone**; OpenAI, Razorpay test mode and Langfuse are external. The MCP server for AI buyers is an optional extra service that just forwards to the same API with a scoped key.
+
 Full deploy guide: [DEPLOY.md](DEPLOY.md).
 
 ---
@@ -178,6 +182,8 @@ flowchart LR
   H --> I[Audit event<br/>append-only]
   I --> J[Response]
 ```
+
+> **What this shows.** The fixed pipeline every single request goes through, in order. Two steps are the ones that matter for this brief: **tenant resolution** drops the database connection into a restricted Postgres role so one merchant physically cannot read another's rows, and the **policy check** runs *before* any write wherever money moves — a denial returns a 4xx and writes a `PAYMENT_FAILED` audit row, and nothing else happens.
 
 Routes stay thin; domain services own the logic. Trust boundaries: the browser is untrusted, LLM output is untrusted, retrieved RAG content is untrusted, external agents are untrusted, webhooks are untrusted until verified, **the database is the source of commerce truth**, the policy engine is authoritative for agent permissions, and payment status comes only from a verified provider event.
 
@@ -229,6 +235,8 @@ sequenceDiagram
   W-->>U: streamed assistant message + product cards
 ```
 
+> **What this shows.** One customer message, end to end. The browser opens a session (the backend picks the workflow and never receives a `merchant_id`), then streams the turn over SSE: the agent plans, calls tools that run real domain services, and the UI shows each planning and tool step live. If the turn proposes a payment, it **stops** and parks an approval — the customer taps *Confirm & Pay*, and the gated action only then runs, with the policy re-checked.
+
 - **Non-streaming twin:** `POST /agent/sessions/{id}/messages` returns the whole turn.
 - **Every tool call** is persisted as an `AgentAction` (node, tool, input, output, policy decision, duration) — that's the [Agent Activity](#) trace in the console.
 
@@ -254,6 +262,8 @@ flowchart TB
   GROWTH --> LOOP
 ```
 
+> **What this shows.** How "multi-agent" actually works here. A lightweight **supervisor** reads the first message and picks one of three specialist agents — shopping, support, or growth — *once*, and that choice is fixed for the session (weak signals get a cached one-word LLM tie-breaker). There are no mid-conversation hand-offs to go wrong. All three specialists then run the **same** bounded plan/act loop; only the prompt and the tool list differ.
+
 Each graph is built by `BaseAgentService` from three pieces: a **system prompt**, a **tool registry**, and the shared **graph shape**. Bounds (`max_graph_steps`, `max_tool_calls`, wall-clock `deadline`) come from `PolicyEngine.get_agent_limits(merchant_id)` and are enforced inside `agent_node` — the merchant can only tighten them.
 
 Details: [`docs/ai/agent-architecture.md`](docs/ai/agent-architecture.md) · [ADR-004](docs/architecture/decisions/ADR-004-langgraph.md) · [ADR-007 (per-turn state, no checkpointer)](docs/architecture/decisions/ADR-007-per-turn-agent-state.md).
@@ -276,6 +286,8 @@ stateDiagram-v2
     now > deadline  → force a final reply
   end note
 ```
+
+> **What this shows.** The inner loop of a single turn. The model alternates between `agent` (think / decide) and `tools` (act) until it produces a plain reply, or a tool parks the turn on an approval. Every pass through `agent` re-checks three bounds — step count, tool-call count, wall-clock deadline — and forces a final answer if any is exceeded, so a runaway loop is structurally impossible.
 
 State is built fresh each turn from persisted data (`agent_sessions`, `agent_messages`, the cart). Nothing durable lives in graph memory — a restart just replays the last turn.
 
@@ -302,6 +314,8 @@ flowchart TB
   F -->|denied| Z["refuse · write PAYMENT_FAILED · nothing else moves"]
   I -->|"not pending / expired"| Z
 ```
+
+> **What this shows.** The centre of the whole project: the nine gates an AI *intention* passes before it becomes a committed *side effect* — schema, authentication, scope, tenant, policy, amount/discount limits, bounded-execution, a one-shot expiring approval, and only then the deterministic service, then the audit write. Fail any gate and the request is refused with a `PAYMENT_FAILED` record and nothing else moves.
 
 - **Refunds and discount-overrides are not grantable scopes** — an external agent cannot even ask.
 - **Approval is a one-shot gate.** `ApprovalRequest` (`status: pending → approved | rejected | expired`, 15-min TTL). The policy is re-evaluated *at execution time*, so a stale "yes" cannot push a charge past a limit that changed.
@@ -332,6 +346,8 @@ sequenceDiagram
   API->>P: verify_payment_signature → _settle()
   P->>P: pending → processing → paid · order → paid · audit PAYMENT_SUCCEEDED
 ```
+
+> **What this shows.** The browser path. The policy check on the amount runs **before** any Razorpay call or DB write. The backend then creates a Razorpay order, the customer pays it with Checkout in the browser, and the returned signature is verified **server-side** before the payment is marked paid — the frontend never gets to declare a payment successful.
 
 ### External AI buyer (no browser → hosted checkout page)
 
@@ -364,6 +380,8 @@ sequenceDiagram
   P->>P: paid · order → paid · audit PAYMENT_SUCCEEDED
 ```
 
+> **What this shows.** The AI-buyer path. The **first** payment call is always unconfirmed and charges nothing — it just returns the amount to relay to a human. The **confirmed** call is the consent signal (the AP2 / ACP model) and may carry a delegated *mandate* — a spending ceiling and an expiry the backend refuses to exceed. Since an agent has no browser, the confirmed call returns a `checkout_url` to our own one-page checkout; its signed result is verified server-side and settles through the **same** `_settle()` code path as the browser flow and the webhook.
+
 A signed `payment_link.paid` / `payment.captured` webhook settles the same way
 when a Razorpay Payment Link *was* minted (matched by `notes.co_payment_id`).
 
@@ -387,6 +405,8 @@ stateDiagram-v2
     terminal — nothing further moves
   end note
 ```
+
+> **What this shows.** Every legal state a payment can be in and the only moves allowed between them. `failed` is terminal. Whatever the settlement path — browser Checkout, hosted checkout page, or webhook — it drives the payment through this same machine, so there is exactly one definition of "paid".
 
 Transitions are validated in code; the DB `CHECK` only constrains the column domain.
 
@@ -414,6 +434,8 @@ flowchart LR
   end
 ```
 
+> **What this shows.** How the support agent answers from a merchant's own documents. On ingestion, docs are chunked along their structure, embedded, and written to a Pinecone namespace unique to that merchant. On retrieval, the query is embedded, filtered to that namespace, and the top chunks are wrapped in an explicit "treat this as data, not instructions" fence before the model sees them — so a prompt injection hidden inside a product doc can't hijack the agent. Accuracy is measured, not assumed (numbers below).
+
 Retrieval results are cached 10 min, keyed by `(namespace, generation, query, doc_type)`; re-ingesting a merchant's docs bumps the generation and invalidates the cache. Accuracy is measured (`backend/tests/rag_eval/`): **hit@3 100 %, hit@1 89 %, MRR 0.94, grounded@1 83 %** over 38 questions / 10 docs. Method: [`docs/ai/rag-eval.md`](docs/ai/rag-eval.md) · security: [`docs/security/prompt-injection-defense.md`](docs/security/prompt-injection-defense.md).
 
 ---
@@ -433,6 +455,8 @@ flowchart TB
 
   BOOT["create_app() boot check<br/>fail closed on missing auth / local DB in prod"]
 ```
+
+> **What this shows.** Tenant isolation enforced in three independent places, so one bug can't breach it. The app sets the merchant on every transaction **and** drops to a Postgres role with no RLS-bypass, so the database itself filters rows; the AI-buyer key is hashed, scoped and rate-limited; and each merchant's vectors live in their own Pinecone namespace. A boot check refuses to start a production instance wired to a dev database or with auth disabled.
 
 `X-Merchant-Id` dev bypass is gated to non-prod. Migrations `0012`/`0013` make RLS actually enforce (the backend connects as `postgres`, which bypasses RLS, so request transactions drop into the non-bypass `app_request` role). Details: [`docs/architecture/security-architecture.md`](docs/architecture/security-architecture.md).
 
@@ -467,6 +491,8 @@ erDiagram
   payments ||--o{ webhook_events : reconciled_by
   payments ||--o{ idempotency_keys : guarded_by
 ```
+
+> **What this shows.** The schema. The left half is ordinary commerce — merchants, products, carts, orders, payments. The right half is what makes this AI-native and first-class rather than bolted on: `agent_sessions` with their `agent_messages` and `agent_actions`, `approval_requests` that park a turn and gate an order, an append-only `audit_events` table, versioned `documents` for RAG, scoped `agent_api_keys`, and `webhook_events` + `idempotency_keys` guarding every payment.
 
 Migrations: `db/migrations/versions/0001…0015`. Structured `shipping_address` lives on `orders` (0015); `payments` carries `payment_link_id` for provider reconcile.
 
