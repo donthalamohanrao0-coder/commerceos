@@ -5,8 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.agent_commerce import _require_idempotency_key
 from app.core.idempotency import IdempotencyConflict, with_idempotency
 
-pytestmark = pytest.mark.asyncio
-
 
 def test_agent_commerce_requires_idempotency_key() -> None:
     assert _require_idempotency_key("  order-42 ") == "order-42"
@@ -16,6 +14,7 @@ def test_agent_commerce_requires_idempotency_key() -> None:
         assert exc.value.status_code == 400
 
 
+@pytest.mark.asyncio
 async def test_replay_returns_cached_response_without_re_executing(
     db: AsyncSession, merchant
 ) -> None:
@@ -38,6 +37,7 @@ async def test_replay_returns_cached_response_without_re_executing(
     assert calls["n"] == 1  # executed exactly once
 
 
+@pytest.mark.asyncio
 async def test_same_key_different_payload_conflicts(db: AsyncSession, merchant) -> None:
     async def execute() -> dict:
         return {"ok": True}
