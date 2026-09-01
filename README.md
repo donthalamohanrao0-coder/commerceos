@@ -16,6 +16,47 @@ Built for the Razorpay Buildathon · *AI Growth & Agentic Commerce*
 
 ---
 
+## At a glance
+
+| Field | Value |
+|---|---|
+| **What it is** | An AI-native commerce platform. An external AI agent can discover products, get an authoritative quote, place an order and pay a merchant end to end on Razorpay test rails — and can never cause financial harm. |
+| **Built for** | Razorpay Buildathon — *AI Growth & Agentic Commerce* |
+| **Tracks covered** | Both. (1) A revenue-growth agent for the merchant. (2) A merchant made transactable by an AI buyer, end to end. |
+| **Core guarantee** | The AI only *proposes* money actions. A deterministic policy engine, domain services and state machines decide whether each is allowed and execute it. Execution is bounded (steps · tool calls · wall-clock). Payment is consent-gated. Every step is written to an append-only audit trail. |
+| **Stack** | Next.js 15 · FastAPI (async) · LangGraph · Supabase Postgres (row-level security) · Pinecone · Redis · Razorpay test mode · OpenAI |
+| **Deployment** | Frontend on Vercel · API + Celery worker on Render · Postgres/Auth on Supabase |
+| **Quality** | `ruff` + `mypy --strict` clean · 93 backend tests · 97 frontend tests · 9 ADRs |
+| **Video walkthrough** | https://youtu.be/WO6tFOEL3Z4 (12 min — chapters below) |
+| **Repository** | https://github.com/donthalamohanrao0-coder/commerceos |
+
+---
+
+## Video walkthrough
+
+[![CommerceOS — 12-minute walkthrough](https://img.youtube.com/vi/WO6tFOEL3Z4/hqdefault.jpg)](https://youtu.be/WO6tFOEL3Z4)
+
+**12-minute walkthrough:** https://youtu.be/WO6tFOEL3Z4
+
+| Time | Chapter |
+|---|---|
+| 0:00 – 0:40 | Introduction — who I am |
+| 0:40 – 1:40 | The problem, and the one principle behind the solution |
+| 1:40 – 2:10 | Three ways CommerceOS is used (customer · merchant console · external AI buyer) |
+| 2:10 – 3:05 | Demo — customer storefront (shopping agent) |
+| 3:05 – 4:25 | Demo — growth assistant: cross-sell / upsell analysis → draft campaign → merchant approval |
+| 4:25 – 6:10 | Demo — external AI buyer: catalog → authoritative quote → order → consent + delegated mandate → hosted checkout → paid |
+| 6:10 – 6:55 | Demo — the append-only audit trail and Agent Activity trace |
+| 6:55 – 7:35 | Demo — graceful failure: an order over the merchant's limit is refused, nothing charged |
+| 7:35 – 8:20 | Architecture — system context |
+| 8:20 – 9:25 | Architecture — the trust layer (nine checks between an AI intention and a side effect) |
+| 9:25 – 10:10 | Architecture — how the agents coordinate (one supervisor, three specialist graphs) |
+| 10:10 – 10:55 | Architecture — payment lifecycle (one `_settle()` path for browser, hosted checkout and webhook) |
+| 10:55 – 11:40 | What broke in production, and how I fixed it (Razorpay payment-link cap → own hosted checkout) |
+| 11:40 – 12:00 | What's next |
+
+---
+
 ## The problem
 
 <div align="center">
@@ -43,6 +84,7 @@ CommerceOS answers **both** directions of the brief:
 
 ## Table of contents
 
+- [At a glance](#at-a-glance) · [Video walkthrough](#video-walkthrough) · [The problem](#the-problem)
 - [System context](#system-context)
 - [Deployment topology](#deployment-topology)
 - [The request lifecycle](#the-request-lifecycle)
