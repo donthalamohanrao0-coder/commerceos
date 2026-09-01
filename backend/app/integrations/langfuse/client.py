@@ -51,34 +51,75 @@ class _NoopTracer:
 # ------------------------------------------------------------------------- real
 
 
+_LEVELS = {"DEBUG", "DEFAULT", "WARNING", "ERROR"}
+
+
+def _level(level: str | None) -> str | None:
+    if not level:
+        return None
+    up = level.upper()
+    return up if up in _LEVELS else "ERROR"
+
+
 class _LangfuseSpan:
+    """Wraps a langfuse v3/v4 observation handle. Every call is guarded — a
+    tracing failure must never surface in an agent turn."""
+
     def __init__(self, handle: Any) -> None:
         self._h = handle
+        self._ended = False
 
     def child(self, *, name: str, kind: str = "span", input: Any = None) -> _LangfuseSpan:
-        factory = self._h.generation if kind == "generation" else self._h.span
-        return _LangfuseSpan(factory(name=name, input=input))
+        try:
+            as_type = "generation" if kind == "generation" else "span"
+            return _LangfuseSpan(self._h.start_observation(name=name, as_type=as_type, input=input))
+        except Exception:  # noqa: BLE001 - never break the turn on a tracing hiccup
+            return _LangfuseSpan(None)
 
     def end(self, *, output: Any = None, level: str | None = None) -> None:
+        if self._h is None or self._ended:
+            return
+        self._ended = True
         try:
-            self._h.end(output=output, level=level)
-        except TypeError:  # older SDK: end() takes no kwargs
-            self._h.update(output=output)
+            self._h.update(output=output, level=_level(level))
             self._h.end()
+        except Exception:  # noqa: BLE001
+            return
 
     def score(self, *, name: str, value: float, comment: str | None = None) -> None:
-        self._h.score(name=name, value=value, comment=comment)
+        if self._h is None:
+            return
+        try:
+            self._h.score(name=name, value=value, comment=comment)
+        except Exception:  # noqa: BLE001
+            return
 
 
 class _LangfuseTracer:
     def __init__(self, client: Any) -> None:
         self._client = client
+        self._open: list[_LangfuseSpan] = []
 
     def trace(self, *, name: str, metadata: dict[str, Any]) -> _LangfuseSpan:
-        return _LangfuseSpan(self._client.trace(name=name, metadata=metadata))
+        try:
+            handle = self._client.start_observation(
+                name=name, as_type="span", metadata=metadata
+            )
+            span = _LangfuseSpan(handle)
+        except Exception:  # noqa: BLE001
+            return _LangfuseSpan(None)
+        self._open.append(span)
+        return span
 
     def flush(self) -> None:
-        self._client.flush()
+        # v4 spans only export once ended; close any root spans the graph left open.
+        for span in self._open:
+            span.end()
+        self._open.clear()
+        try:
+            self._client.flush()
+        except Exception:  # noqa: BLE001
+            return
 
 
 @lru_cache
