@@ -4,9 +4,10 @@
 
 **An AI-native commerce platform — where an agent can transact, and never cause financial harm.**
 
-Built for the Razorpay Buildathon · *AI Growth & Agentic Commerce*
+**Razorpay Buildathon · Track 01 — AI Growth & Agentic Commerce**
+*Grow the merchant's revenue, and make them sellable to AI buyers.*
 
-`Next.js` · `FastAPI` · `LangGraph` · `Supabase` · `Pinecone` · `Razorpay (test mode)`
+`Next.js` · `FastAPI` · `LangGraph` · `OpenAI (LLM)` · `Supabase` · `Pinecone` · `Razorpay (test mode)`
 
 <br/>
 
@@ -21,10 +22,10 @@ Built for the Razorpay Buildathon · *AI Growth & Agentic Commerce*
 | Field | Value |
 |---|---|
 | **What it is** | An AI-native commerce platform. An external AI agent can discover products, get an authoritative quote, place an order and pay a merchant end to end on Razorpay test rails — and can never cause financial harm. |
-| **Built for** | Razorpay Buildathon — *AI Growth & Agentic Commerce* |
-| **Tracks covered** | Both. (1) A revenue-growth agent for the merchant. (2) A merchant made transactable by an AI buyer, end to end. |
+| **Built for** | Razorpay Buildathon · **Track 01 — AI Growth & Agentic Commerce**: *grow the merchant's revenue, and make them sellable to AI buyers* |
+| **Tracks covered** | Both halves of Track 01. (1) A revenue-growth agent for the merchant. (2) A merchant made sellable to an AI buyer, end to end. |
 | **Core guarantee** | The AI only *proposes* money actions. A deterministic policy engine, domain services and state machines decide whether each is allowed and execute it. Execution is bounded (steps · tool calls · wall-clock). Payment is consent-gated. Every step is written to an append-only audit trail. |
-| **Stack** | Next.js 15 · FastAPI (async) · LangGraph · Supabase Postgres (row-level security) · Pinecone · Redis · Razorpay test mode · OpenAI |
+| **Main tech stack** | **Next.js 15** (frontend) · **FastAPI** (backend, async) · **LangGraph** (agent orchestration) · **OpenAI** — `gpt-5` (LLM) + `text-embedding-3-small` (embeddings) · **Supabase Postgres** (row-level security) · **Pinecone** (vector store) · **Redis** · **Razorpay** test mode |
 | **Deployment** | Frontend on Vercel · API + Celery worker on Render · Postgres/Auth on Supabase |
 | **Quality** | `ruff` + `mypy --strict` clean · 93 backend tests · 97 frontend tests · 9 ADRs |
 | **Video walkthrough** | https://youtu.be/WO6tFOEL3Z4 (12 min — chapters below) |
@@ -59,32 +60,30 @@ Built for the Razorpay Buildathon · *AI Growth & Agentic Commerce*
 
 ## The problem
 
-<div align="center">
-
-<img src="presentation/assets/images/readme-problem.png" alt="The problem: storefronts aren't machine-consumable (no clean catalog API, no authoritative price, no safe way to let software pay) and nobody trusts AI near money (hallucinated prices, runaway tool loop, prompt injection in docs, a charge with no consent and no record). CommerceOS answers both, on one principle: the AI can only propose a money action — deterministic backend services, policies and state machines validate and execute it, and every step lands in an append-only audit trail." width="920">
-
-</div>
-
 Commerce is built for a human clicking a mouse. Agents are about to be both the **buyers** and the merchant's **sales force**, and three things break:
 
-- a storefront isn't machine-consumable — no clean catalog API, no *authoritative* price, no bounded way to let software pay;
-- a merchant has no agent working *for* them — spotting revenue, timing an upsell, drafting a campaign;
-- nobody trusts an AI near money — hallucinated prices, a runaway tool loop, a prompt injection inside a product doc, a charge with no consent and no record.
+1. **A storefront isn't machine-consumable.** No clean catalog API, no *authoritative* price, no bounded way to let software pay.
+2. **A merchant has no agent working *for* them.** Nobody is spotting revenue opportunities, timing an upsell, or drafting a campaign.
+3. **Nobody trusts an AI near money.** Hallucinated prices, a runaway tool loop, a prompt injection hidden inside a product doc, a charge with no consent and no record.
 
-CommerceOS answers **both** directions of the brief:
+---
 
-| Track | What it delivers |
+## The solution
+
+CommerceOS answers **both halves** of Track 01 — *"grow the merchant's revenue, and make them sellable to AI buyers"*:
+
+| Track half | What it delivers |
 |---|---|
 | **Grow the merchant's revenue** | a growth agent (Console → **Growth assistant**) + analytics + upsell/cross-sell tied to real campaigns, all gated on merchant approval |
-| **Make the merchant transactable by an AI buyer, end to end** | a scoped-key API + MCP server: `catalog → authoritative quote → idempotent order → consent-gated payment` on real Razorpay test rails |
+| **Make the merchant sellable to AI buyers, end to end** | a scoped-key API + MCP server: `catalog → authoritative quote → idempotent order → consent-gated payment` on real Razorpay test rails |
 
-> **Core principle.** The AI may *propose* a money action. Deterministic backend services, policies and state machines decide whether it's allowed and execute it — and every step lands in an append-only audit trail.
+> **Core principle.** The AI may *propose* a money action. Deterministic backend services, policies and state machines decide whether it's allowed and execute it — and every step lands in an append-only audit trail. That's how every one of the three problems above gets closed at once.
 
 ---
 
 ## Table of contents
 
-- [At a glance](#at-a-glance) · [Video walkthrough](#video-walkthrough) · [The problem](#the-problem)
+- [At a glance](#at-a-glance) · [Video walkthrough](#video-walkthrough) · [The problem](#the-problem) · [The solution](#the-solution)
 - [System context](#system-context)
 - [Deployment topology](#deployment-topology)
 - [The request lifecycle](#the-request-lifecycle)
@@ -143,7 +142,7 @@ flowchart TB
     PG[("Supabase Postgres<br/>RLS + SET LOCAL ROLE app_request")]:::ext
     PC[("Pinecone<br/>namespace per merchant")]:::ext
     RD[("Redis<br/>cache + rate limit")]:::ext
-    OAI["OpenAI<br/>gpt-4o-mini + embeddings"]:::ext
+    OAI["OpenAI<br/>gpt-5 (LLM) + embeddings"]:::ext
     RZP["Razorpay<br/>test-mode APIs + webhooks"]:::ext
     LF["Langfuse<br/>agent traces"]:::ext
   end
@@ -567,7 +566,7 @@ Migrations: `db/migrations/versions/0001…0015`. Structured `shipping_address` 
 |---|---|
 | **Frontend** | Next.js 15 (App Router), React 19, TypeScript strict, Tailwind v4, TanStack Query v5, `@supabase/supabase-js`, Recharts |
 | **Backend** | FastAPI (async), SQLAlchemy 2.0 + asyncpg, Alembic, Pydantic v2, `uv` |
-| **AI** | LangGraph, OpenAI `gpt-4o-mini` + `text-embedding-3-small` |
+| **AI / LLM** | **OpenAI** — `gpt-5` (reasoning) + `gpt-5-mini` (fast classifier) + `text-embedding-3-small` (embeddings), orchestrated with **LangGraph** |
 | **Data** | Supabase Postgres 17, Pinecone (per-merchant namespaces), Redis |
 | **Async** | Celery + Redis (knowledge ingestion, analytics snapshots) |
 | **Payments** | Razorpay test mode — Orders, Checkout, Payment Links, signed webhooks |
@@ -642,7 +641,7 @@ cd apps/web && npm run verify                   # typecheck + lint + vitest + bu
 npm run test:e2e                                # Playwright against a running stack
 ```
 
-~90 backend tests (payment gating, RLS isolation, idempotency, agent guardrails, mandate/reconcile), 97 frontend tests, Playwright e2e. RAG accuracy is a runnable script (`python -m tests.rag_eval.runner`).
+93 backend tests (payment gating, RLS isolation, idempotency, agent guardrails, mandate/reconcile), 97 frontend tests, Playwright e2e. RAG accuracy is a runnable script (`python -m tests.rag_eval.runner`).
 
 ---
 
