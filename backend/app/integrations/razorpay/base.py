@@ -36,6 +36,49 @@ class RazorpayClient(Protocol):
         self, *, amount_paise: int, receipt: str, notes: dict[str, str]
     ) -> RazorpayOrder: ...
 
+    # ---------------------------------------------------- recurring / UPI AutoPay
+    def create_customer(self, *, name: str, email: str, contact: str) -> str:
+        """Register the buyer as a Razorpay customer; returns the `cust_...` id.
+        Needed before a mandate order — the token is bound to a customer."""
+        ...
+
+    def create_mandate_order(
+        self,
+        *,
+        provider_customer_id: str,
+        max_amount_paise: int,
+        expire_at_unix: int,
+        frequency: str,
+        notes: dict[str, str],
+    ) -> RazorpayOrder:
+        """The zero-amount authorisation order that carries the `token` block
+        (max_amount, expire_at, frequency). A human runs Checkout against it once
+        with `recurring: 1`; that registers the mandate and mints a token."""
+        ...
+
+    def confirm_mandate_authorization(
+        self, *, mandate_order_id: str, provider_payment_id: str
+    ) -> str:
+        """After a human completes the authorisation payment, resolve the minted
+        mandate token id (`token_...`). Raises if no token was created."""
+        ...
+
+    def charge_recurring(
+        self,
+        *,
+        provider_order_id: str,
+        provider_customer_id: str,
+        token_id: str,
+        amount_paise: int,
+        email: str,
+        contact: str,
+        notes: dict[str, str],
+    ) -> str:
+        """Charge a fresh order against an existing mandate token, no browser.
+        Returns the `pay_...` id. Rejected by the provider if amount_paise exceeds
+        the mandate's max_amount."""
+        ...
+
     def create_payment_link(
         self, *, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]
     ) -> RazorpayPaymentLink:

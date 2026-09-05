@@ -56,6 +56,30 @@ class PaymentMandateIn(BaseModel):
     expires_at: datetime
 
 
+class CreateMandateIn(BaseModel):
+    """Set up a standing spending mandate for a buyer. Returns a one-time
+    authorization_url a human opens once; afterwards confirmed payments charge
+    within the ceiling with no checkout hand-off (Razorpay UPI AutoPay)."""
+
+    buyer: BuyerIn
+    max_amount_paise: int = Field(ge=1)
+    expires_at: datetime
+    consent_reference: str = Field(min_length=1, max_length=200)
+
+
+class MandateOut(BaseModel):
+    mandate_id: uuid.UUID
+    status: str
+    max_amount_paise: int
+    currency: str = "INR"
+    expires_at: datetime
+    consent_reference: str
+    # Present while status == pending_authorization: a human opens this once to
+    # approve the mandate in Razorpay Checkout.
+    authorization_url: str | None = None
+    message: str | None = None
+
+
 class PaymentRequestIn(BaseModel):
     mandate: PaymentMandateIn | None = None
 

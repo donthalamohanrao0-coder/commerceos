@@ -38,6 +38,7 @@ _SCOPE_DESCRIPTIONS = {
     "quote:create": "Get an authoritative quote (campaign price, discount, shipping, tax, total).",
     "order:create": "Create an order. Requires an Idempotency-Key header.",
     "payment:request": "Request payment for an order (two-phase: probe, then confirm).",
+    "mandate:create": "Set up a standing spending mandate (charge within a ceiling, no checkout).",
 }
 
 _ADVISORY_POLICY_KEYS = (
@@ -161,8 +162,21 @@ async def agent_commerce_manifest(session: AsyncSession = _SESSION) -> dict:
             "order_create": f"{api}/orders",
             "order_get": f"{api}/orders/{{order_id}}",
             "payment_request": f"{api}/orders/{{order_id}}/payment",
+            "mandate_create": f"{api}/mandates",
+            "mandate_get": f"{api}/mandates/{{mandate_id}}",
         },
         "flow": _FLOW,
+        "standing_mandate": {
+            "what": "A human approves a ceiling + expiry once (Razorpay UPI AutoPay "
+            "`as_presented` variable mandate). Afterwards a confirmed payment for a "
+            "covered order settles with no checkout hand-off.",
+            "setup": "POST /mandates {buyer, max_amount_paise, expires_at, consent_reference} "
+            "-> authorization_url; a human opens it once.",
+            "use": "POST /orders/{id}/payment?confirmed=true — if an active mandate covers "
+            "the order, the response is {status: paid} with no checkout_url.",
+            "bounds": "The backend refuses a charge above the ceiling or past the expiry; "
+            "a cancelled mandate falls back to hosted checkout.",
+        },
         "mandate_schema": _MANDATE_SCHEMA,
         "idempotency": {
             "header": "Idempotency-Key",

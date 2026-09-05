@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_session
 from app.api.envelope import ok
 from app.domains.payments.exceptions import PaymentNotFound
+from app.domains.payments.mandate_service import MandateService
 from app.domains.payments.service import PaymentService
 from app.integrations.razorpay.base import RazorpayClient
 from app.integrations.razorpay.factory import get_razorpay_client
@@ -80,6 +81,43 @@ async def razorpay_webhook(
         payment_entity = entities.get("payment", {}).get("entity", {})
         link_entity = entities.get("payment_link", {}).get("entity", {})
         order_entity = entities.get("order", {}).get("entity", {})
+        token_entity = entities.get("token", {}).get("entity", {})
+
+        # UPI AutoPay / e-mandate token lifecycle — activate or cancel the
+        # matching standing mandate (matched on the Razorpay customer id).
+        token_events = {
+            "token.confirmed": "active",
+            "token.rejected": "cancel",
+            "token.cancelled": "cancel",
+            "token.paused": "cancel",
+        }
+        if event_type in token_events:
+            mandates = MandateService(session, razorpay_client=razorpay_client)
+            tok_customer = token_entity.get("customer_id")
+            tok_id = token_entity.get("id") or token_entity.get("token")
+            handled = "token_no_customer_match"
+            if tok_customer:
+                if token_events[event_type] == "active" and tok_id:
+                    m = await mandates.activate_by_provider_customer(
+                        str(tok_customer), provider_token_id=str(tok_id)
+                    )
+                    handled = "mandate_activated" if m else "token_no_customer_match"
+                else:
+                    m = await mandates.cancel_by_provider_customer(
+                        str(tok_customer), reason=event_type
+                    )
+                    handled = "mandate_cancelled" if m else "token_no_customer_match"
+            event.processing_status = "processed"
+            event.processed_at = datetime.now(UTC)
+            await session.flush()
+            _log.info(
+                "razorpay webhook: event=%s id=%s token_customer=%s -> %s",
+                event_type,
+                provider_event_id,
+                tok_customer,
+                handled,
+            )
+            return ok({"status": "processed", "outcome": handled})
 
         # notes ride on whichever entity carries them; the payment-link path stamps
         # our own payment id there because the link runs its own internal order.

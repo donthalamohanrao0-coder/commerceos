@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agent_commerce.keys import AgentPrincipal
 from app.agent_commerce.schemas import (
     CatalogSearchIn,
+    CreateMandateIn,
     CreateOrderIn,
     PaymentRequestIn,
     QuoteIn,
@@ -33,6 +34,7 @@ _CATALOG_SEARCH = Depends(require_scope("catalog:search"))
 _QUOTE_CREATE = Depends(require_scope("quote:create"))
 _ORDER_CREATE = Depends(require_scope("order:create"))
 _PAYMENT_REQUEST = Depends(require_scope("payment:request"))
+_MANDATE_CREATE = Depends(require_scope("mandate:create"))
 _TENANT_SESSION = Depends(get_agent_tenant_session)
 # Mutating routes (create order, charge payment) REQUIRE a stable key so a
 # retried request can never create a second order / second charge. Read and
@@ -213,6 +215,43 @@ async def get_order(
     async with session.begin():
         order = await _svc(session, principal).get_order(principal.merchant_id, order_id)
     return ok(order.model_dump(mode="json"))
+
+
+@router.post("/mandates", operation_id="createMandate")
+async def create_mandate(
+    body: CreateMandateIn,
+    idempotency_key: str | None = _IDEMPOTENCY_KEY,
+    principal: AgentPrincipal = _MANDATE_CREATE,
+    session: AsyncSession = _TENANT_SESSION,
+) -> dict:
+    idem = _require_idempotency_key(idempotency_key)
+    async with session.begin():
+        svc = _svc(session, principal)
+
+        async def _execute() -> dict[str, Any]:
+            mandate = await svc.create_mandate(principal.merchant_id, body)
+            return mandate.model_dump(mode="json")
+
+        result = await with_idempotency(
+            session,
+            merchant_id=principal.merchant_id,
+            operation="agent_commerce.create_mandate",
+            idempotency_key=idem,
+            request_payload=body.model_dump(mode="json"),
+            execute=_execute,
+        )
+    return ok(result)
+
+
+@router.get("/mandates/{mandate_id}", operation_id="getMandate")
+async def get_mandate(
+    mandate_id: uuid.UUID,
+    principal: AgentPrincipal = _MANDATE_CREATE,
+    session: AsyncSession = _TENANT_SESSION,
+) -> dict:
+    async with session.begin():
+        mandate = await _svc(session, principal).get_mandate(principal.merchant_id, mandate_id)
+    return ok(mandate.model_dump(mode="json"))
 
 
 @router.post("/orders/{order_id}/payment", operation_id="requestPayment")

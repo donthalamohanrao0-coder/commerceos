@@ -14,6 +14,7 @@ AGENT_API_SCOPES = (
     "quote:create",
     "order:create",
     "payment:request",
+    "mandate:create",
 )
 
 

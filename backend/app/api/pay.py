@@ -29,8 +29,11 @@ from app.api.envelope import ok
 from app.core.config import get_settings
 from app.domains.orders.models import Order
 from app.domains.payments.exceptions import PaymentVerificationFailed
-from app.domains.payments.models import Payment
+from app.domains.payments.mandate_service import MandateService
+from app.domains.payments.models import Payment, PaymentMandate
 from app.domains.payments.service import PaymentService
+from app.integrations.razorpay.base import RazorpayClient
+from app.integrations.razorpay.factory import get_razorpay_client
 
 _log = logging.getLogger(__name__)
 router = APIRouter(prefix="/pay", tags=["checkout"])
@@ -116,6 +119,138 @@ def render_checkout_page(payment: Payment, order: Order, *, key_id: str) -> str:
         "</script>"
     )
     return _page(title=f"Pay for {order.order_number}", body=body)
+
+
+def render_mandate_page(mandate: PaymentMandate, *, key_id: str) -> str:
+    """Pure: the one-time approval page for a standing spending mandate. A human
+    runs Razorpay Checkout with `recurring: 1` once; that registers the mandate."""
+    rupees = f"₹{mandate.max_amount_paise / 100:,.2f}"
+    expires = mandate.expires_at.strftime("%d %b %Y")
+    body = (
+        "<h1>Approve a spending mandate</h1>"
+        "<p>CommerceOS &middot; Razorpay UPI AutoPay (test mode)</p>"
+        f"<div class='amt'>up to {rupees}</div>"
+        f"<p>per charge &middot; valid until {html.escape(expires)}<br/>"
+        f"reference: {html.escape(mandate.consent_reference)}</p>"
+        "<button id='pay'>Approve mandate</button>"
+        "<div id='status'></div>"
+        "<div class='muted'>After you approve once, purchases within this ceiling "
+        "settle automatically with no further checkout.</div>"
+        "<script src='https://checkout.razorpay.com/v1/checkout.js'></script>"
+        "<script>"
+        f"var KEY={key_id!r};"
+        f"var ORDER_ID={mandate.provider_order_id!r};"
+        f"var CUSTOMER_ID={mandate.provider_customer_id!r};"
+        f"var MANDATE_ID={str(mandate.id)!r};"
+        "var s=document.getElementById('status');var btn=document.getElementById('pay');"
+        "function done(cls,msg){s.className=cls;s.innerHTML=msg;btn.disabled=true;}"
+        "btn.onclick=function(){"
+        "var rzp=new Razorpay({key:KEY,order_id:ORDER_ID,customer_id:CUSTOMER_ID,"
+        "recurring:1,currency:'INR',name:'CommerceOS',description:'Spending mandate',"
+        "theme:{color:'#3b82f6'},"
+        "handler:function(r){"
+        "s.className='';s.innerHTML='Registering mandate\\u2026';"
+        "fetch('/pay/mandate/'+MANDATE_ID+'/callback',{method:'POST',"
+        "headers:{'Content-Type':'application/json'},body:JSON.stringify({"
+        "razorpay_payment_id:r.razorpay_payment_id,razorpay_order_id:r.razorpay_order_id,"
+        "razorpay_signature:r.razorpay_signature})})"
+        ".then(function(x){return x.json().then(function(b){return {ok:x.ok,b:b};});})"
+        ".then(function(o){if(o.ok){done('ok','Mandate approved \\u2014 you can close "
+        "this page.');}else{done('err','Failed: '+(o.b.detail||'unknown error'));}})"
+        ".catch(function(){done('err','Network error. Do not retry \\u2014 contact the "
+        "merchant.');});"
+        "},"
+        "modal:{ondismiss:function(){s.className='';s.innerHTML='Closed.';}}"
+        "});rzp.on('payment.failed',function(){done('err','Authorisation failed.');});"
+        "rzp.open();};"
+        "</script>"
+    )
+    return _page(title="Approve a spending mandate", body=body)
+
+
+@router.get("/mandate/{mandate_id}", response_class=HTMLResponse)
+async def mandate_page(
+    mandate_id: uuid.UUID, session: AsyncSession = _SESSION
+) -> HTMLResponse:
+    mandate = await session.get(PaymentMandate, mandate_id)
+    if mandate is None:
+        raise HTTPException(status_code=404, detail="mandate not found")
+    settings = get_settings()
+
+    if mandate.status == "active":
+        return HTMLResponse(
+            _page(
+                title="Mandate active",
+                body=(
+                    "<h1>Mandate already approved</h1>"
+                    "<p class='ok'>This spending mandate is active. Nothing more to do.</p>"
+                ),
+            )
+        )
+    if mandate.status in ("cancelled", "expired"):
+        return HTMLResponse(
+            _page(
+                title="Mandate unavailable",
+                body=(
+                    f"<h1>Mandate {html.escape(mandate.status)}</h1>"
+                    "<p class='err'>Ask the merchant to issue a fresh mandate.</p>"
+                ),
+            )
+        )
+    if not (settings.razorpay_key_id and mandate.provider_order_id):
+        raise HTTPException(status_code=503, detail="mandate authorisation is not configured")
+    return HTMLResponse(render_mandate_page(mandate, key_id=settings.razorpay_key_id))
+
+
+async def activate_from_callback(
+    session: AsyncSession,
+    mandate_id: uuid.UUID,
+    body: CheckoutCallbackIn,
+    *,
+    razorpay_client: RazorpayClient | None = None,
+) -> dict:
+    """Verify the browser's signed authorisation result and mark the mandate
+    active. Transaction-free (the route wraps it); unscoped session keyed by the
+    mandate's own merchant id, like the webhook handler."""
+    mandate = await session.get(PaymentMandate, mandate_id)
+    if mandate is None:
+        raise HTTPException(status_code=404, detail="mandate not found")
+    if mandate.status == "active":
+        return {"mandate_id": str(mandate.id), "status": "active"}
+
+    razorpay = razorpay_client or get_razorpay_client()
+    if not razorpay.verify_payment_signature(
+        order_id=mandate.provider_order_id or "",
+        payment_id=body.razorpay_payment_id,
+        signature=body.razorpay_signature,
+    ):
+        raise HTTPException(status_code=400, detail="signature verification failed")
+
+    try:
+        token_id = razorpay.confirm_mandate_authorization(
+            mandate_order_id=mandate.provider_order_id or "",
+            provider_payment_id=body.razorpay_payment_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("mandate %s: token resolution failed: %s", mandate_id, exc)
+        raise HTTPException(status_code=400, detail="mandate token not created") from exc
+
+    activated = await MandateService(session, razorpay_client=razorpay).activate(
+        mandate, provider_token_id=token_id
+    )
+    return {"mandate_id": str(activated.id), "status": activated.status}
+
+
+@router.post("/mandate/{mandate_id}/callback")
+async def mandate_callback(
+    mandate_id: uuid.UUID,
+    body: CheckoutCallbackIn,
+    session: AsyncSession = _SESSION,
+) -> dict:
+    async with session.begin():
+        result = await activate_from_callback(session, mandate_id, body)
+    _log.info("mandate %s activated via hosted approval", mandate_id)
+    return ok(result)
 
 
 async def _load(session: AsyncSession, payment_id: uuid.UUID) -> tuple[Payment, Order]:

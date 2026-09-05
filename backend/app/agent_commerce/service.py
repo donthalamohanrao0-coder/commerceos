@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agent_commerce.schemas import (
     BuyerIn,
     CatalogSearchIn,
+    CreateMandateIn,
     LineItemIn,
+    MandateOut,
     OrderOut,
     PaymentMandateIn,
     PaymentOut,
@@ -37,7 +39,9 @@ from app.domains.customers.models import Customer
 from app.domains.orders.exceptions import OrderNotFound
 from app.domains.orders.service import OrderService
 from app.domains.payments.exceptions import PaymentPolicyDenied
+from app.domains.payments.mandate_service import MandateService
 from app.domains.payments.service import PaymentService
+from app.integrations.razorpay.base import RazorpayClient
 from app.integrations.razorpay.factory import get_razorpay_client
 from app.policies.engine import PolicyEngine
 
@@ -64,9 +68,16 @@ def _decode_cursor(cursor: str) -> tuple[str, str]:
 
 
 class AgentCommerceService:
-    def __init__(self, session: AsyncSession, *, actor_id: str) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        actor_id: str,
+        razorpay_client: RazorpayClient | None = None,
+    ) -> None:
         self._session = session
         self._actor_id = actor_id
+        self._razorpay = razorpay_client
         self._catalog = CatalogService(session)
         self._inventory = InventoryService(session)
         self._orders = OrderService(session)
@@ -125,6 +136,25 @@ class AgentCommerceService:
         )
         return [await self._to_product_out(merchant_id, p) for p in products]
 
+    async def _upsert_customer(self, merchant_id: uuid.UUID, buyer: BuyerIn) -> Customer:
+        customer = await self._session.scalar(
+            select(Customer).where(
+                Customer.merchant_id == merchant_id,
+                (Customer.email == buyer.email) | (Customer.phone == buyer.phone),
+            )
+        )
+        if customer is None:
+            customer = Customer(id=uuid.uuid4(), merchant_id=merchant_id, name=buyer.name)
+            self._session.add(customer)
+        customer.name, customer.email, customer.phone, customer.city = (
+            buyer.name,
+            buyer.email,
+            buyer.phone,
+            buyer.city,
+        )
+        await self._session.flush()
+        return customer
+
     async def _build_cart(self, merchant_id: uuid.UUID, items: list[LineItemIn]) -> uuid.UUID:
         cart_svc = CartService(self._session)
         cart = await cart_svc.create_fresh_cart(merchant_id)
@@ -182,22 +212,7 @@ class AgentCommerceService:
 
         shipping_address: dict[str, str] | None = None
         if buyer is not None:
-            customer = await self._session.scalar(
-                select(Customer).where(
-                    Customer.merchant_id == merchant_id,
-                    (Customer.email == buyer.email) | (Customer.phone == buyer.phone),
-                )
-            )
-            if customer is None:
-                customer = Customer(id=uuid.uuid4(), merchant_id=merchant_id, name=buyer.name)
-                self._session.add(customer)
-            customer.name, customer.email, customer.phone, customer.city = (
-                buyer.name,
-                buyer.email,
-                buyer.phone,
-                buyer.city,
-            )
-            await self._session.flush()
+            customer = await self._upsert_customer(merchant_id, buyer)
             cart = await self._session.get(Cart, cart_id)
             if cart is not None:
                 cart.customer_id = customer.id
@@ -250,6 +265,51 @@ class AgentCommerceService:
             tax_paise=order.tax_paise,
             total_paise=order.total_paise,
             shipping_address=order.shipping_address,
+        )
+
+    async def create_mandate(
+        self, merchant_id: uuid.UUID, body: CreateMandateIn
+    ) -> MandateOut:
+        customer = await self._upsert_customer(merchant_id, body.buyer)
+        mandate = await MandateService(self._session, razorpay_client=self._razorpay).create(
+            merchant_id,
+            customer=customer,
+            max_amount_paise=body.max_amount_paise,
+            expires_at=body.expires_at,
+            consent_reference=body.consent_reference,
+            actor_id=self._actor_id,
+        )
+        base = get_settings().public_base_url.rstrip("/")
+        return MandateOut(
+            mandate_id=mandate.id,
+            status=mandate.status,
+            max_amount_paise=mandate.max_amount_paise,
+            expires_at=mandate.expires_at,
+            consent_reference=mandate.consent_reference,
+            authorization_url=f"{base}/pay/mandate/{mandate.id}",
+            message=(
+                "Open authorization_url once so a human approves this mandate. After "
+                "that, confirmed payments within the ceiling settle with no checkout."
+            ),
+        )
+
+    async def get_mandate(
+        self, merchant_id: uuid.UUID, mandate_id: uuid.UUID
+    ) -> MandateOut:
+        mandates = MandateService(self._session, razorpay_client=self._razorpay)
+        mandate = await mandates.get(merchant_id, mandate_id)
+        base = get_settings().public_base_url.rstrip("/")
+        return MandateOut(
+            mandate_id=mandate.id,
+            status=mandate.status,
+            max_amount_paise=mandate.max_amount_paise,
+            expires_at=mandate.expires_at,
+            consent_reference=mandate.consent_reference,
+            authorization_url=(
+                f"{base}/pay/mandate/{mandate.id}"
+                if mandate.status == "pending_authorization"
+                else None
+            ),
         )
 
     async def request_payment(
@@ -311,8 +371,56 @@ class AgentCommerceService:
                 )
             mandate_dict = mandate.model_dump(mode="json")
 
+        # Standing mandate: if this buyer pre-authorised a ceiling that covers the
+        # order and hasn't expired, charge it now — no checkout hand-off.
+        if order.customer_id is not None:
+            mandates = MandateService(self._session, razorpay_client=self._razorpay)
+            standing = await mandates.find_chargeable(
+                merchant_id, order.customer_id, order.total_paise
+            )
+            if standing is not None:
+                addr = order.shipping_address or {}
+                pay_svc = PaymentService(self._session, self._razorpay)
+                try:
+                    charged = await pay_svc.charge_via_mandate(
+                        merchant_id,
+                        order_id,
+                        mandate=standing,
+                        buyer_email=str(addr.get("email", "")),
+                        buyer_contact=str(addr.get("phone", "")),
+                        idempotency_key=idempotency_key,
+                        actor_type="external_agent",
+                        actor_id=self._actor_id,
+                    )
+                except PaymentPolicyDenied as exc:
+                    return PaymentOut(
+                        order_id=order.id,
+                        status="policy_denied",
+                        amount_paise=order.total_paise,
+                        message=exc.reason,
+                    )
+                except Exception as exc:  # noqa: BLE001 - provider rejected the recurring charge
+                    _log.warning("mandate charge failed for %s: %s", order.order_number, exc)
+                    return PaymentOut(
+                        order_id=order.id,
+                        status="mandate_charge_failed",
+                        amount_paise=order.total_paise,
+                        message=f"{type(exc).__name__}: {exc}",
+                    )
+                return PaymentOut(
+                    payment_id=uuid.UUID(str(charged["payment_id"])),
+                    order_id=order.id,
+                    status="paid",
+                    amount_paise=int(str(charged["amount_paise"])),
+                    provider_order_id=None,
+                    message=(
+                        f"Charged against mandate {standing.id} "
+                        f"(consent {standing.consent_reference}). Settled, no further action."
+                    ),
+                )
+
         try:
-            result = await PaymentService(self._session).create_payment_intent(
+            result = await PaymentService(self._session, self._razorpay).create_payment_intent(
                 merchant_id,
                 order_id,
                 idempotency_key=idempotency_key,
@@ -341,7 +449,7 @@ class AgentCommerceService:
         link_id: str | None = None
         link_error: str | None = None
         try:
-            link = get_razorpay_client().create_payment_link(
+            link = (self._razorpay or get_razorpay_client()).create_payment_link(
                 amount_paise=int(str(result["amount_paise"])),
                 reference_id=f"{order.order_number}-{str(payment_id)[:8]}",
                 description=f"CommerceOS order {order.order_number}",
@@ -352,7 +460,7 @@ class AgentCommerceService:
                 },
             )
             link_url, link_id = link.short_url, link.link_id
-            await PaymentService(self._session).attach_payment_link(
+            await PaymentService(self._session, self._razorpay).attach_payment_link(
                 payment_id, link_id=link.link_id, link_url=link.short_url
             )
         except Exception as exc:  # noqa: BLE001 - link is a bonus; checkout_url stands alone

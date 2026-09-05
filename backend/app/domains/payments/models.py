@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -16,6 +18,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 from app.core.model_mixins import TimestampMixin, UpdatedAtMixin, UUIDPKMixin
+
+MANDATE_STATUSES = ("pending_authorization", "active", "cancelled", "expired")
 
 PAYMENT_STATUSES = (
     "created",
@@ -76,6 +80,41 @@ class Payment(Base, UUIDPKMixin, TimestampMixin, UpdatedAtMixin):
             unique=True,
             postgresql_where=text("provider_order_id IS NOT NULL"),
         ),
+    )
+
+
+class PaymentMandate(Base, UUIDPKMixin, TimestampMixin, UpdatedAtMixin):
+    """A buyer's standing, pre-authorised spending mandate (AP2/ACP/UAP on real
+    rails). A human authorises the ceiling + expiry once; afterwards an external
+    AI buyer's confirmed payment charges within it with no checkout hand-off."""
+
+    __tablename__ = "payment_mandates"
+
+    merchant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("merchants.id"), nullable=False
+    )
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String, nullable=False, default="razorpay")
+    provider_customer_id: Mapped[str | None] = mapped_column(String)
+    provider_token_id: Mapped[str | None] = mapped_column(String)
+    provider_order_id: Mapped[str | None] = mapped_column(String)
+    method: Mapped[str] = mapped_column(String, nullable=False, default="upi")
+    max_amount_paise: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    currency: Mapped[str] = mapped_column(String, nullable=False, default="INR")
+    consent_reference: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default="pending_authorization"
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    authorized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint(f"status IN {MANDATE_STATUSES}", name="ck_payment_mandates_status"),
+        CheckConstraint("max_amount_paise > 0", name="ck_payment_mandates_amount_positive"),
+        Index("idx_payment_mandates_merchant_customer", "merchant_id", "customer_id"),
     )
 
 

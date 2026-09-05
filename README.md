@@ -27,7 +27,7 @@
 | **Core guarantee** | The AI only *proposes* money actions. A deterministic policy engine, domain services and state machines decide whether each is allowed and execute it. Execution is bounded (steps · tool calls · wall-clock). Payment is consent-gated. Every step is written to an append-only audit trail. |
 | **Main tech stack** | **Next.js 15** (frontend) · **FastAPI** (backend, async) · **LangGraph** (agent orchestration) · **OpenAI** — `gpt-5` (LLM) + `text-embedding-3-small` (embeddings) · **Supabase Postgres** (row-level security) · **Pinecone** (vector store) · **Redis** · **Razorpay** test mode |
 | **Deployment** | Frontend on Vercel · API + Celery worker on Render · Postgres/Auth on Supabase |
-| **Quality** | `ruff` + `mypy --strict` clean · 95 backend tests · 97 frontend tests · 9 ADRs |
+| **Quality** | `ruff` + `mypy --strict` clean · 101 backend tests · 97 frontend tests · 10 ADRs |
 | **Video walkthrough** | https://youtu.be/WO6tFOEL3Z4 (12 min — chapters below) |
 | **Repository** | https://github.com/donthalamohanrao0-coder/commerceos |
 
@@ -450,6 +450,37 @@ when a Razorpay Payment Link *was* minted (matched by `notes.co_payment_id`).
 
 **If the callback or a webhook is missed:** console → Payments → **Reconcile** (`POST /console/payments/{id}/reconcile`) asks Razorpay directly and settles if the provider says it cleared.
 
+### External AI buyer with a standing mandate (no checkout hand-off)
+
+Once a human has authorised a mandate ([ADR-010](docs/architecture/decisions/ADR-010-delegated-payment-mandates.md)), the confirmed call charges it directly — the agent completes the purchase on its own.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as AI buyer (MCP)
+  participant API as agent-commerce API
+  participant M as MandateService
+  participant P as PaymentService
+  participant RZP as Razorpay (recurring)
+  Note over B,RZP: one-time setup — done earlier by a human
+  B->>API: POST /mandates {buyer, max_amount_paise, expires_at, consent_reference}
+  API->>M: create customer + authorization order · mandate = pending_authorization
+  API-->>B: {mandate_id, authorization_url}
+  B-->>RZP: (human) opens authorization_url · Checkout recurring:1
+  RZP-->>API: signed result / token.confirmed webhook
+  API->>M: activate · store token · mandate = active
+  Note over B,RZP: later — every purchase, no human
+  B->>API: POST /orders/{id}/payment?confirmed=true
+  API->>M: find_chargeable(buyer, total) — active · not expired · ceiling covers it
+  API->>P: charge_via_mandate — policy re-checked
+  P->>RZP: payments/create/recurring (order, customer, token)
+  RZP-->>P: razorpay_payment_id
+  P->>P: _settle() · paid · order → paid · audit PAYMENT_SUCCEEDED
+  API-->>B: {status: "paid"}  — no checkout_url
+```
+
+> **What this shows.** The autonomous path. Setup happens once: the agent registers a mandate and a human approves a ceiling + expiry in Razorpay Checkout. After that, a confirmed payment for any covered order is charged straight against the mandate token via `payments/create/recurring` and settled through the **same** `_settle()` as every other path — the response is `paid` with no `checkout_url`. Over the ceiling, past the expiry, or a cancelled token falls back to hosted checkout.
+
 ### Payment state machine
 
 ```mermaid
@@ -487,7 +518,17 @@ A buyer agent that has never seen this merchant can find out how to transact —
 
 Transacting still requires a scoped `ack_live_…` key; only discovery is open. The manifest advertises `refund` and `discount-override` as **non-grantable** — a buyer can't even ask.
 
-**On the roadmap:** the delegated mandate (`consent_reference` · `max_amount_paise` · `expires_at`, refused server-side if exceeded or expired) is modelled on AP2 / ACP / UAP. In production it maps onto Razorpay's recurring rails — a UPI AutoPay *variable* mandate (`as_presented`) authorised once, then charged per-order within the ceiling, instead of a hosted-checkout hand-off each time.
+### Delegated mandates — autonomous purchase within a ceiling
+
+The hosted-checkout hand-off is a consent gate, not autonomous commerce. A **standing mandate** closes that: a human delegates a bounded spend once, and the agent transacts within it afterwards (the AP2 / ACP / UAP model, [ADR-010](docs/architecture/decisions/ADR-010-delegated-payment-mandates.md)).
+
+| Step | Call | Effect |
+|---|---|---|
+| **Set up** | `POST /agent-commerce/mandates` (scope `mandate:create`) — `{buyer, max_amount_paise, expires_at, consent_reference}` | registers a Razorpay customer + authorization order; returns a one-time `authorization_url` |
+| **Approve** | a human opens `authorization_url` once — Razorpay Checkout with `recurring: 1` | mints a UPI AutoPay `as_presented` (variable-amount) mandate token; the mandate goes `active` (also via a `token.confirmed` webhook) |
+| **Use** | `POST /orders/{id}/payment?confirmed=true` | if an active mandate covers the order, the backend charges it via `payments/create/recurring` and settles through the same `_settle()` path — response is `{status: "paid"}`, **no `checkout_url`** |
+
+Every charge is still bounded server-side: over the ceiling, past `expires_at`, or a cancelled token (`token.cancelled` webhook) all fall back to hosted checkout. The provider call sits behind the `RazorpayClient` seam; live UPI AutoPay needs the **Recurring Payments** feature enabled on the Razorpay account (test mode included), and the Fake client exercises the full lifecycle for local dev, tests and the demo.
 
 ---
 
@@ -658,7 +699,7 @@ cd apps/web && npm run verify                   # typecheck + lint + vitest + bu
 npm run test:e2e                                # Playwright against a running stack
 ```
 
-95 backend tests (payment gating, RLS isolation, idempotency, agent guardrails, mandate/reconcile), 97 frontend tests, Playwright e2e. RAG accuracy is a runnable script (`python -m tests.rag_eval.runner`).
+101 backend tests (payment gating, RLS isolation, idempotency, agent guardrails, mandate/reconcile), 97 frontend tests, Playwright e2e. RAG accuracy is a runnable script (`python -m tests.rag_eval.runner`).
 
 ---
 
@@ -666,7 +707,7 @@ npm run test:e2e                                # Playwright against a running s
 
 | Area | Path |
 |---|---|
-| Architecture + **9 ADRs** + golden-path trace | [`docs/architecture/`](docs/architecture/) |
+| Architecture + **10 ADRs** + golden-path trace | [`docs/architecture/`](docs/architecture/) |
 | Engineering standards (API, coding, testing, CI) | [`docs/engineering/`](docs/engineering/) |
 | Security, guardrails, prompt-injection defense, audit | [`docs/security/`](docs/security/) |
 | AI / agent design, evaluation strategy, RAG | [`docs/ai/`](docs/ai/) |

@@ -37,6 +37,83 @@ class RealRazorpayClient:
             receipt=result["receipt"],
         )
 
+    # ------------------------------------------------- recurring / UPI AutoPay
+    # Requires the "Recurring Payments" feature enabled on the Razorpay account
+    # (test mode included). See docs/architecture/decisions/ADR-010.
+
+    def create_customer(self, *, name: str, email: str, contact: str) -> str:
+        result = self._client.customer.create(
+            {"name": name, "email": email, "contact": contact, "fail_existing": "0"}
+        )
+        return str(result["id"])
+
+    def create_mandate_order(
+        self,
+        *,
+        provider_customer_id: str,
+        max_amount_paise: int,
+        expire_at_unix: int,
+        frequency: str,
+        notes: dict[str, str],
+    ) -> RazorpayOrder:
+        result = self._client.order.create(
+            {
+                "amount": 0,
+                "currency": "INR",
+                "method": "upi",
+                "customer_id": provider_customer_id,
+                "token": {
+                    "max_amount": max_amount_paise,
+                    "expire_at": expire_at_unix,
+                    "frequency": frequency,
+                },
+                "receipt": notes.get("co_mandate_id", "mandate"),
+                "notes": notes,
+            }
+        )
+        return RazorpayOrder(
+            provider_order_id=result["id"],
+            amount_paise=result["amount"],
+            currency=result["currency"],
+            receipt=result.get("receipt", ""),
+        )
+
+    def confirm_mandate_authorization(
+        self, *, mandate_order_id: str, provider_payment_id: str
+    ) -> str:
+        payment = self._client.payment.fetch(provider_payment_id)
+        token = payment.get("token_id") or payment.get("token")
+        if not token:
+            raise ValueError("authorisation payment produced no mandate token")
+        return str(token)
+
+    def charge_recurring(
+        self,
+        *,
+        provider_order_id: str,
+        provider_customer_id: str,
+        token_id: str,
+        amount_paise: int,
+        email: str,
+        contact: str,
+        notes: dict[str, str],
+    ) -> str:
+        result = self._client.payment.createRecurring(
+            {
+                "email": email,
+                "contact": contact,
+                "amount": amount_paise,
+                "currency": "INR",
+                "order_id": provider_order_id,
+                "customer_id": provider_customer_id,
+                "token": token_id,
+                "recurring": True,
+                "description": notes.get("description", "CommerceOS recurring charge"),
+                "notes": notes,
+            }
+        )
+        return str(result["razorpay_payment_id"])
+
     def create_payment_link(
         self, *, amount_paise: int, reference_id: str, description: str, notes: dict[str, str]
     ) -> RazorpayPaymentLink:

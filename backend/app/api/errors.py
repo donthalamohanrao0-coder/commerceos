@@ -25,6 +25,7 @@ from app.domains.payments.exceptions import (
     PaymentPolicyDenied,
     PaymentVerificationFailed,
 )
+from app.domains.payments.mandate_service import MandateNotFound
 
 
 def _error_body(code: str, message: str) -> dict:
@@ -46,6 +47,7 @@ _EXCEPTION_MAP: list[tuple[type[Exception], int, str]] = [
     (CartItemNotFound, 404, "CART_ITEM_NOT_FOUND"),
     (OrderNotFound, 404, "ORDER_NOT_FOUND"),
     (PaymentNotFound, 404, "PAYMENT_NOT_FOUND"),
+    (MandateNotFound, 404, "MANDATE_NOT_FOUND"),
     (ApprovalNotFound, 404, "APPROVAL_NOT_FOUND"),
     (EmptyCart, 422, "CART_EMPTY"),
     (InsufficientStock, 409, "INSUFFICIENT_STOCK"),

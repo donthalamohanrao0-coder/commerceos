@@ -18,7 +18,7 @@ from app.domains.payments.exceptions import (
     PaymentPolicyDenied,
     PaymentVerificationFailed,
 )
-from app.domains.payments.models import Payment
+from app.domains.payments.models import Payment, PaymentMandate
 from app.domains.payments.state_machine import transition
 from app.integrations.razorpay.base import RazorpayClient
 from app.integrations.razorpay.factory import get_razorpay_client
@@ -122,6 +122,116 @@ class PaymentService:
             operation="create_payment",
             idempotency_key=idempotency_key,
             request_payload={"order_id": str(order_id)},
+            execute=_execute,
+        )
+
+    async def charge_via_mandate(
+        self,
+        merchant_id: uuid.UUID,
+        order_id: uuid.UUID,
+        *,
+        mandate: PaymentMandate,
+        buyer_email: str,
+        buyer_contact: str,
+        idempotency_key: str,
+        actor_type: ActorType,
+        actor_id: str | None,
+    ) -> dict[str, object]:
+        """Autonomous charge against a pre-authorised standing mandate — no browser,
+        no hosted checkout. Policy is still re-checked here; the provider refuses a
+        charge above the mandate ceiling. Settles through the same _settle() path."""
+        order = await self._session.get(Order, order_id)
+        if order is None or order.merchant_id != merchant_id:
+            raise PaymentNotFound(str(order_id))
+
+        policy_decision = await self._policy_engine.check_transaction_amount(
+            merchant_id, order.total_paise
+        )
+        if not policy_decision.allowed:
+            await self._audit.record(
+                merchant_id=merchant_id,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                order_id=order.id,
+                action="PAYMENT_FAILED",
+                input={"reason": "policy_denied", "via": "mandate"},
+                policy_decision={"allowed": False, "reason": policy_decision.reason},
+            )
+            raise PaymentPolicyDenied(policy_decision.reason)
+
+        async def _execute() -> dict[str, object]:
+            existing = await self._session.scalar(
+                select(Payment).where(Payment.order_id == order.id)
+            )
+            payment = existing or Payment(
+                id=uuid.uuid4(),
+                merchant_id=merchant_id,
+                order_id=order.id,
+                amount_paise=order.total_paise,
+            )
+            if existing is None:
+                self._session.add(payment)
+                await self._session.flush()
+
+            notes = {
+                "merchant_id": str(merchant_id),
+                "order_id": str(order.id),
+                "co_mandate_id": str(mandate.id),
+                "description": f"CommerceOS order {order.order_number}",
+            }
+            razorpay_order = self._razorpay.create_order(
+                amount_paise=order.total_paise, receipt=order.order_number, notes=notes
+            )
+            payment.provider_order_id = razorpay_order.provider_order_id
+            transition(payment, "pending")
+            await self._session.flush()
+
+            await self._audit.record(
+                merchant_id=merchant_id,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                order_id=order.id,
+                action="PAYMENT_CREATED",
+                input={
+                    "mandate": {
+                        "id": str(mandate.id),
+                        "consent_reference": mandate.consent_reference,
+                    }
+                },
+                result={
+                    "payment_id": str(payment.id),
+                    "provider_order_id": payment.provider_order_id,
+                },
+                policy_decision={"allowed": True, "reason": policy_decision.reason},
+            )
+
+            provider_payment_id = self._razorpay.charge_recurring(
+                provider_order_id=razorpay_order.provider_order_id,
+                provider_customer_id=mandate.provider_customer_id or "",
+                token_id=mandate.provider_token_id or "",
+                amount_paise=order.total_paise,
+                email=buyer_email,
+                contact=buyer_contact,
+                notes=notes,
+            )
+            payment.provider_payment_id = provider_payment_id
+            await self._session.flush()
+
+            settled = await self._settle(payment)
+            return {
+                "payment_id": str(settled.id),
+                "status": settled.status,
+                "amount_paise": settled.amount_paise,
+                "currency": settled.currency,
+                "provider_payment_id": provider_payment_id,
+            }
+
+        return await with_idempotency(
+            self._session,
+            merchant_id=merchant_id,
+            operation="charge_via_mandate",
+            idempotency_key=idempotency_key,
+            request_payload={"order_id": str(order_id), "mandate_id": str(mandate.id)},
             execute=_execute,
         )
 
