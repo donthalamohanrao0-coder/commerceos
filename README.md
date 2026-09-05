@@ -27,7 +27,7 @@
 | **Core guarantee** | The AI only *proposes* money actions. A deterministic policy engine, domain services and state machines decide whether each is allowed and execute it. Execution is bounded (steps · tool calls · wall-clock). Payment is consent-gated. Every step is written to an append-only audit trail. |
 | **Main tech stack** | **Next.js 15** (frontend) · **FastAPI** (backend, async) · **LangGraph** (agent orchestration) · **OpenAI** — `gpt-5` (LLM) + `text-embedding-3-small` (embeddings) · **Supabase Postgres** (row-level security) · **Pinecone** (vector store) · **Redis** · **Razorpay** test mode |
 | **Deployment** | Frontend on Vercel · API + Celery worker on Render · Postgres/Auth on Supabase |
-| **Quality** | `ruff` + `mypy --strict` clean · 93 backend tests · 97 frontend tests · 9 ADRs |
+| **Quality** | `ruff` + `mypy --strict` clean · 95 backend tests · 97 frontend tests · 9 ADRs |
 | **Video walkthrough** | https://youtu.be/WO6tFOEL3Z4 (12 min — chapters below) |
 | **Repository** | https://github.com/donthalamohanrao0-coder/commerceos |
 
@@ -75,7 +75,7 @@ CommerceOS answers **both halves** of Track 01 — *"grow the merchant's revenue
 | Track half | What it delivers |
 |---|---|
 | **Grow the merchant's revenue** | a growth agent (Console → **Growth assistant**) + analytics + upsell/cross-sell tied to real campaigns, all gated on merchant approval |
-| **Make the merchant sellable to AI buyers, end to end** | a scoped-key API + MCP server: `catalog → authoritative quote → idempotent order → consent-gated payment` on real Razorpay test rails |
+| **Make the merchant sellable to AI buyers, end to end** | a public discovery manifest (`/.well-known/agent-commerce`) + a scoped-key API + MCP server: `catalog → authoritative quote → idempotent order → consent-gated payment` on real Razorpay test rails |
 
 > **Core principle.** The AI may *propose* a money action. Deterministic backend services, policies and state machines decide whether it's allowed and execute it — and every step lands in an append-only audit trail. That's how every one of the three problems above gets closed at once.
 
@@ -92,6 +92,7 @@ CommerceOS answers **both halves** of Track 01 — *"grow the merchant's revenue
 - [The LangGraph turn loop](#the-langgraph-turn-loop)
 - [The trust layer](#the-trust-layer)
 - [Payment lifecycle](#payment-lifecycle)
+- [Discovery & interoperability](#discovery--interoperability)
 - [RAG pipeline](#rag-pipeline)
 - [Multi-tenant isolation](#multi-tenant-isolation)
 - [Data model](#data-model)
@@ -474,6 +475,22 @@ Transitions are validated in code; the DB `CHECK` only constrains the column dom
 
 ---
 
+## Discovery & interoperability
+
+A buyer agent that has never seen this merchant can find out how to transact — three ways, no prior integration:
+
+| Mechanism | Endpoint | For |
+|---|---|---|
+| **Discovery manifest** | `GET /.well-known/agent-commerce` (public, unauthenticated) | any HTTP client — returns the auth scheme, how to get a scoped key, every endpoint URL, the ordered `catalog → quote → order → consent-gated payment` flow, the delegated-mandate schema, idempotency rules, this merchant's live policy caps, and the server-side guarantees |
+| **MCP tool discovery** | `integrations/buyer-mcp` (stdio + HTTP) | an MCP client (Claude Desktop, etc.) — the same capability surface as self-describing tools with typed schemas |
+| **OpenAPI export** | `GET /api/v1/agent-commerce/openapi.json` | a ChatGPT Custom GPT ("Import from URL") — trimmed to just the buyer paths, absolute `servers` URL |
+
+Transacting still requires a scoped `ack_live_…` key; only discovery is open. The manifest advertises `refund` and `discount-override` as **non-grantable** — a buyer can't even ask.
+
+**On the roadmap:** the delegated mandate (`consent_reference` · `max_amount_paise` · `expires_at`, refused server-side if exceeded or expired) is modelled on AP2 / ACP / UAP. In production it maps onto Razorpay's recurring rails — a UPI AutoPay *variable* mandate (`as_presented`) authorised once, then charged per-order within the ceiling, instead of a hosted-checkout hand-off each time.
+
+---
+
 ## RAG pipeline
 
 Structure-aware chunking, one Pinecone namespace per merchant, retrieved text fenced as **data, not instructions**.
@@ -641,7 +658,7 @@ cd apps/web && npm run verify                   # typecheck + lint + vitest + bu
 npm run test:e2e                                # Playwright against a running stack
 ```
 
-93 backend tests (payment gating, RLS isolation, idempotency, agent guardrails, mandate/reconcile), 97 frontend tests, Playwright e2e. RAG accuracy is a runnable script (`python -m tests.rag_eval.runner`).
+95 backend tests (payment gating, RLS isolation, idempotency, agent guardrails, mandate/reconcile), 97 frontend tests, Playwright e2e. RAG accuracy is a runnable script (`python -m tests.rag_eval.runner`).
 
 ---
 

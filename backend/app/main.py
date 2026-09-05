@@ -7,6 +7,7 @@ from app.api.errors import register_exception_handlers
 from app.api.middleware.request_context import RequestContextMiddleware
 from app.api.pay import router as pay_router
 from app.api.v1.router import api_router
+from app.api.well_known import router as well_known_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.core.otel import init_otel
@@ -69,6 +70,8 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix=settings.api_prefix)
     # Root-mounted (no /api/v1): the hosted checkout URL is handed to a human.
     app.include_router(pay_router)
+    # Root-mounted: /.well-known/agent-commerce is public discovery for AI buyers.
+    app.include_router(well_known_router)
 
     init_otel(app)  # exports to console until OTEL_EXPORTER_OTLP_ENDPOINT is set
 
